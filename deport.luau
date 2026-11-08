@@ -93,24 +93,27 @@ visualsui.scale = visualsui.mobile and 0.85 or 1
 
 local sc = visualsui.scale
 
+-- Black-blue, not black-white. The menu sits on a deep navy rather than a
+-- neutral gray so the blue accent reads as part of the surface instead of a
+-- sticker on top of it.
 visualsui.theme = {
-	bg = Color3.fromRGB(14, 14, 16),
-	side = Color3.fromRGB(17, 17, 20),
-	panel = Color3.fromRGB(20, 20, 23),
-	head = Color3.fromRGB(24, 24, 27),
-	line = Color3.fromRGB(38, 38, 42),
-	glow = Color3.fromRGB(95, 95, 102),
-	text = Color3.fromRGB(235, 235, 238),
-	dim = Color3.fromRGB(150, 150, 158),
-	accent = Color3.fromRGB(60, 140, 255),
+	bg = Color3.fromRGB(6, 9, 18),
+	side = Color3.fromRGB(8, 12, 24),
+	panel = Color3.fromRGB(11, 16, 32),
+	head = Color3.fromRGB(15, 22, 42),
+	line = Color3.fromRGB(34, 54, 96),
+	glow = Color3.fromRGB(96, 148, 255),
+	text = Color3.fromRGB(232, 239, 255),
+	dim = Color3.fromRGB(134, 152, 188),
+	accent = Color3.fromRGB(64, 140, 255),
 }
 
 visualsui.sheet = {
-	bg = Color3.fromRGB(28, 28, 30),
-	row = Color3.fromRGB(44, 44, 46),
-	press = Color3.fromRGB(58, 58, 60),
-	sep = Color3.fromRGB(66, 66, 69),
-	grab = Color3.fromRGB(99, 99, 102),
+	bg = Color3.fromRGB(9, 14, 28),
+	row = Color3.fromRGB(18, 26, 47),
+	press = Color3.fromRGB(26, 37, 65),
+	sep = Color3.fromRGB(36, 52, 88),
+	grab = Color3.fromRGB(88, 108, 148),
 	blue = Color3.fromRGB(10, 132, 255),
 }
 
@@ -228,6 +231,20 @@ local function icon(v)
 	end
 
 	if string.find(v, "://", 1, true) then
+		-- Old catalogue rows still carry the web form
+		-- (http://www.roblox.com/asset/?id=123); an ImageLabel will not fetch
+		-- that, so hand it the content id instead of leaving the cell blank.
+		-- rbxthumb/rbxasset schemes are left untouched.
+		if string.find(string.lower(v), "roblox.com", 1, true) then
+			local id = string.match(v, "asset/?id=(%d+)")
+				or string.match(v, "assetId=(%d+)")
+				or string.match(v, "[?&]id=(%d+)")
+
+			if id then
+				return "rbxassetid://" .. id
+			end
+		end
+
 		return v
 	end
 
@@ -312,6 +329,10 @@ end
 local quick = TweenInfo.new(0.09, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local glide = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local soft = TweenInfo.new(0.24, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+-- iOS sheets settle rather than stop: a short spring on scale, and a longer
+-- ease-out on size so a panel grows past the finger and eases into place.
+local spring = TweenInfo.new(0.34, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+local swell = TweenInfo.new(0.30, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
 
 local function rnd()
@@ -496,6 +517,13 @@ end
 
 local function inq(t)
 	return t * t
+end
+
+-- easeOutBack: a small overshoot then a settle. Used for scale, never for
+-- height, so a panel does not clip its own content while it springs.
+local function spry(t)
+	local s = t - 1
+	return 1 + 2.24 * s * s * s + 1.24 * s * s
 end
 
 local function flow(o, dur, curve, step, lag)
@@ -3904,6 +3932,111 @@ function ui.warmth(button, target, rest, lit)
 	end)
 end
 
+-- The watermark plate's recipe, reusable: a translucent body, a soft
+-- top-down wash, a one-pixel gloss along the top rim, and a shadow where the
+-- client can draw one. Roblox cannot blur what is behind a frame, so this is
+-- as close to liquid glass as the engine gets - and it keeps every surface
+-- (window, cards, dropdowns) reading as the same material.
+function ui.glass(panel, radius, opts)
+	opts = opts or {}
+
+	local corner = tonumber(radius) or 12
+	local wash = typeof(opts.wash) == "Color3" and opts.wash or th.glow
+	local shade = typeof(opts.shade) == "Color3" and opts.shade or th.bg
+	local z = tonumber(opts.z) or 1
+
+	local skin = new("Frame", {
+		Name = rnd(),
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = wash,
+		BackgroundTransparency = tonumber(opts.washTransparency) or 0.86,
+		BorderSizePixel = 0,
+		ZIndex = z,
+	}, panel)
+
+	round(skin, corner)
+
+	fade(skin, 90, {
+		NumberSequenceKeypoint.new(0, 0.32),
+		NumberSequenceKeypoint.new(0.55, 0.8),
+		NumberSequenceKeypoint.new(1, 0.94),
+	})
+
+	local gloss = new("Frame", {
+		Name = rnd(),
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 1),
+		Size = UDim2.new(1, -math.max(corner * 2, 14), 0, 1),
+		BackgroundColor3 = wash,
+		BackgroundTransparency = tonumber(opts.glossTransparency) or 0.58,
+		BorderSizePixel = 0,
+		ZIndex = z,
+	}, panel)
+
+	fade(gloss, 0, {
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(0.5, 0.05),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+
+	if (tonumber(opts.lift) or 0) > 0 and deep then
+		new("UIShadow", {
+			Color = shade,
+			BlurRadius = UDim.new(0, tonumber(opts.lift)),
+			Offset = UDim2.fromOffset(0, 2),
+			Spread = UDim2.fromOffset(-2, -2),
+			Transparency = tonumber(opts.shadow) or 0.55,
+			ZIndex = -1,
+		}, panel)
+	end
+
+	local sheen
+
+	if opts.sheen then
+		sheen = new("Frame", {
+			Name = rnd(),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(-0.4, 0.5),
+			Size = UDim2.new(0.32, 0, 2, 0),
+			Rotation = 18,
+			BackgroundColor3 = Color3.new(1, 1, 1),
+			BackgroundTransparency = 0,
+			BorderSizePixel = 0,
+			Visible = false,
+			ZIndex = z,
+		}, panel)
+
+		fade(sheen, 0, {
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.5, 0.84),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+	end
+
+	return { skin = skin, gloss = gloss, sheen = sheen }
+end
+
+-- One pass of light across a glass surface, the way an iOS sheet catches the
+-- room as it comes up. Called on open only; it stops itself.
+function ui.sheen(glass, dur)
+	local sheen = glass and glass.sheen
+
+	if not sheen or not sheen.Parent then
+		return
+	end
+
+	sheen.Visible = true
+	sheen.Position = UDim2.fromScale(-0.4, 0.5)
+
+	flow(sheen, dur or 0.7, outq, function(k)
+		sheen.Position = UDim2.fromScale(-0.4 + k * 1.8, 0.5)
+
+		if k >= 1 then
+			sheen.Visible = false
+		end
+	end)
+end
+
 -- A floating layer: the dropdown lists, the colour panels, the context
 -- menus. One is open at a time and a click anywhere else shuts it, which is
 -- what sky/skyzone above already arrange.
@@ -3914,6 +4047,7 @@ function ui.floater(width, height)
 		Name = rnd(),
 		Size = UDim2.fromOffset(width, height),
 		BackgroundColor3 = ui.sheet.bg,
+		BackgroundTransparency = 0.04,
 		BorderSizePixel = 0,
 		ClipsDescendants = true,
 		Visible = false,
@@ -3929,16 +4063,7 @@ function ui.floater(width, height)
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	}, hull)
 
-	if deep then
-		new("UIShadow", {
-			Color = Color3.new(),
-			BlurRadius = UDim.new(0, 18),
-			Offset = UDim2.fromOffset(0, 6),
-			Spread = UDim2.fromOffset(-4, -4),
-			Transparency = 0.45,
-			ZIndex = -1,
-		}, hull)
-	end
+	ui.glass(hull, 12, { lift = 18, shade = Color3.new(), z = 0 })
 
 	shrink(hull)
 	visualsui.floating[hull] = true
@@ -4008,7 +4133,20 @@ end
 function ui.reveal(hull, tall)
 	hull.Visible = true
 	hull.Size = UDim2.new(hull.Size.X.Scale, hull.Size.X.Offset, 0, 0)
-	anim(hull, soft, { Size = UDim2.new(hull.Size.X.Scale, hull.Size.X.Offset, 0, tall) })
+
+	-- The height grows on an ease-out; the surface itself springs up from
+	-- just under full size, which is what gives the panel its weight.
+	local scale = hull:FindFirstChildOfClass("UIScale")
+
+	if not scale then
+		scale = new("UIScale", { Scale = 1 }, hull)
+	end
+
+	local base = scale.Scale
+
+	scale.Scale = base * 0.94
+	anim(scale, spring, { Scale = base })
+	anim(hull, swell, { Size = UDim2.new(hull.Size.X.Scale, hull.Size.X.Offset, 0, tall) })
 end
 
 function ui.conceal(hull, done)
@@ -4110,6 +4248,10 @@ function visualsui:window(cfg)
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 		LineJoinMode = Enum.LineJoinMode.Round,
 	}, shell)
+
+	-- The shell wears the same glass as the watermark: a wash over the deep
+	-- navy body and one gloss line under the header.
+	local shellglass = ui.glass(shell, 16, { lift = 30, shade = th.bg, washTransparency = 0.9, sheen = true, z = 0 })
 
 	shrink(shell)
 
@@ -4332,6 +4474,15 @@ function visualsui:window(cfg)
 	}, shell)
 
 	round(capsule, 11)
+
+	new("UIStroke", {
+		Color = th.line,
+		Thickness = 1,
+		Transparency = 0.35,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+	}, capsule)
+
+	ui.glass(capsule, 11, { lift = 10, washTransparency = 0.9, z = 1 })
 
 	-- --------------------------------------------------------- content ----
 	local board = new("Frame", {
@@ -4794,18 +4945,24 @@ function visualsui:window(cfg)
 			shell.Visible = true
 			hush()
 			sink()
+			ui.sheen(shellglass, 0.8)
 		end
 
 		local from = shell.GroupTransparency
 		local to = want and 0 or 1
-		local sfrom = pop.Scale
+		local sfrom = want and 0.94 or pop.Scale
 		local sto = want and 1 or 0.96
 
-		flow(shell, want and 0.22 or 0.16, want and outq or inq, function(k)
-			shell.GroupTransparency = from + (to - from) * k
-			pop.Scale = sfrom + (sto - sfrom) * k
+		-- Opacity eases out; scale springs so the window lands with a little
+		-- weight instead of stopping dead.
+		flow(shell, want and 0.34 or 0.16, function(t) return t end, function(t)
+			local a = want and outq(t) or inq(t)
+			local s = want and spry(t) or t
 
-			if k >= 1 and not win.open then
+			shell.GroupTransparency = from + (to - from) * a
+			pop.Scale = sfrom + (sto - sfrom) * s
+
+			if t >= 1 and not win.open then
 				shell.Visible = false
 				pop.Scale = 1
 			end
@@ -5754,6 +5911,7 @@ function ui.attach(win, host)
 
 		local el = { row = row, name = c.name }
 		local hull, rows, shown, body = nil, {}, false, nil
+		local drawn, version = -1, 0
 
 		local function shownvalue()
 			if not c.multi then
@@ -5893,6 +6051,17 @@ function ui.attach(win, host)
 		local function fillrows()
 			build()
 
+			-- Opening the list again used to destroy and rebuild every row.
+			-- The rows are only stale when the value list changed; otherwise
+			-- just repaint the ticks and keep what is already there.
+			if drawn == version then
+				paintrows()
+
+				return
+			end
+
+			drawn = version
+
 			for _, r in next, rows do
 				r.row:Destroy()
 			end
@@ -6001,6 +6170,7 @@ function ui.attach(win, host)
 
 		function el:setlist(values)
 			table.clear(list)
+			version += 1
 
 			for _, v in next, values or {} do
 				list[#list + 1] = tostring(v)
@@ -6499,11 +6669,14 @@ function ui.cardshell(win, lane, c)
 		LayoutOrder = #lane:GetChildren(),
 	}, lane)
 
+	local glass = ui.glass(slot, 12, { lift = 12, shade = th.bg, washTransparency = 0.84, z = 1 })
+
 	local panel = new("Frame", {
 		Name = rnd(),
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundColor3 = th.panel,
+		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 	}, slot)
 
@@ -7049,6 +7222,22 @@ function ui.gallery(win, lane, cfg)
 		return ""
 	end
 
+	-- A cell with no art still has to say what it is. Two initials on the
+	-- gradient beat an empty box, and they cost nothing.
+	local function initials(text)
+		local out = ""
+
+		for word in string.gmatch(tostring(text or ""), "%a+") do
+			out = out .. string.upper(string.sub(word, 1, 1))
+
+			if #out >= 2 then
+				break
+			end
+		end
+
+		return out
+	end
+
 	local function value()
 		if not cfg.multi then
 			return pick
@@ -7103,36 +7292,68 @@ function ui.gallery(win, lane, cfg)
 
 	-- ------------------------------------------------------------- cells ----
 	local function dress(slot, e)
-		slot.entry = e
-
 		if not e then
-			slot.frame.Visible = false
+			if slot.frame.Visible then
+				slot.frame.Visible = false
+			end
+
+			slot.entry = nil
 
 			return
 		end
 
-		slot.frame.Visible = true
-		slot.tag.Text = e.label
+		if not slot.frame.Visible then
+			slot.frame.Visible = true
+		end
 
-		local art = picture(e)
+		-- Scrolling re-dresses the same cells over and over. The picture and
+		-- its crop only change when the record under the cell changes; the
+		-- selection edge is cheap and still repaints every time.
+		if slot.entry ~= e then
+			slot.entry = e
+			slot.tag.Text = e.label
 
-		slot.art.Image = art
-		slot.art.Visible = art ~= ""
-		slot.blank.Visible = art == ""
+			local art = picture(e)
 
-		if e.rect and e.rectsize then
-			slot.art.ImageRectOffset = e.rect
-			slot.art.ImageRectSize = e.rectsize
-		else
-			slot.art.ImageRectOffset = Vector2.zero
-			slot.art.ImageRectSize = Vector2.zero
+			if slot.art.Image ~= art then
+				slot.art.Image = art
+			end
+
+			slot.art.Visible = art ~= ""
+			slot.blank.Visible = art == ""
+
+			if art == "" then
+				local letters = initials(e.label)
+
+				slot.initials.Text = letters
+				slot.initials.Visible = letters ~= ""
+				slot.glyph.Visible = letters == ""
+			end
+
+			if e.rect and e.rectsize then
+				slot.art.ImageRectOffset = e.rect
+				slot.art.ImageRectSize = e.rectsize
+			else
+				slot.art.ImageRectOffset = Vector2.zero
+				slot.art.ImageRectSize = Vector2.zero
+			end
 		end
 
 		local on = chosen(e.name)
+		local edge = on and th.accent or th.line
+		local alpha = on and 0 or 0.6
 
-		slot.edge.Color = on and th.accent or th.line
-		slot.edge.Transparency = on and 0 or 0.6
-		slot.tick.Visible = on
+		if slot.edge.Color ~= edge then
+			slot.edge.Color = edge
+		end
+
+		if slot.edge.Transparency ~= alpha then
+			slot.edge.Transparency = alpha
+		end
+
+		if slot.tick.Visible ~= on then
+			slot.tick.Visible = on
+		end
 	end
 
 	local function hitcell(slot)
@@ -7187,18 +7408,52 @@ function ui.gallery(win, lane, cfg)
 			ZIndex = 2,
 		}, box)
 
-		local blank = new("ImageLabel", {
+		local blank = new("Frame", {
 			Name = rnd(),
-			AnchorPoint = Vector2.new(0.5, 0),
-			Position = UDim2.new(0.5, 0, 0, 5),
-			Size = UDim2.fromOffset(span * 0.4, span * 0.4),
-			BackgroundTransparency = 1,
-			Image = icon(cfg.blank),
-			ImageColor3 = th.dim,
-			ImageTransparency = 0.45,
-			ScaleType = Enum.ScaleType.Fit,
+			Position = UDim2.fromOffset(5, 5),
+			Size = UDim2.new(1, -10, 0, span - 12),
+			BackgroundColor3 = th.head,
+			BorderSizePixel = 0,
 			ZIndex = 2,
 		}, box)
+
+		round(blank, 8)
+
+		new("UIGradient", {
+			Color = ColorSequence.new(th.accent, th.panel),
+			Rotation = 135,
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0.45),
+				NumberSequenceKeypoint.new(1, 0.78),
+			}),
+		}, blank)
+
+		local glyph = new("ImageLabel", {
+			Name = rnd(),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.45),
+			Size = UDim2.fromOffset(span * 0.34, span * 0.34),
+			BackgroundTransparency = 1,
+			Image = icon(cfg.blank),
+			ImageColor3 = th.text,
+			ImageTransparency = 0.35,
+			ScaleType = Enum.ScaleType.Fit,
+			ZIndex = 2,
+		}, blank)
+
+		local initials = new("TextLabel", {
+			Name = rnd(),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.45),
+			Size = UDim2.fromScale(1, 1),
+			BackgroundTransparency = 1,
+			Font = Enum.Font.GothamBold,
+			Text = "",
+			TextColor3 = th.text,
+			TextTransparency = 0.15,
+			TextSize = math.max(12, math.floor(span * 0.26)),
+			ZIndex = 2,
+		}, blank)
 
 		local tag = new("TextLabel", {
 			Name = rnd(),
@@ -7230,7 +7485,7 @@ function ui.gallery(win, lane, cfg)
 
 		new("UICorner", { CornerRadius = UDim.new(1, 0) }, tick)
 
-		local slot = { frame = box, art = art, blank = blank, tag = tag, tick = tick, edge = edge }
+		local slot = { frame = box, art = art, blank = blank, glyph = glyph, initials = initials, tag = tag, tick = tick, edge = edge }
 
 		local hit = ui.hitbox(box, { ZIndex = 5 })
 
@@ -7292,17 +7547,36 @@ function ui.gallery(win, lane, cfg)
 
 	-- ------------------------------------------------------ virtual rows ----
 	local cols, rows = 1, 0
+	local pass = 0
+	local last = { cols = -1, rows = -1, need = -1, first = -1, pass = -1 }
 
 	local function reflow()
 		local width = asz(list).X
+		local tall = asz(list).Y
+		local pitch = span + 16 + gap
 
 		cols = math.max(math.floor((width + gap) / (span + gap)), 1)
 		rows = math.ceil(#view / cols)
 
-		list.CanvasSize = UDim2.fromOffset(0, rows * (span + 16 + gap))
+		-- Shrinking the canvas has to happen before the first row is read:
+		-- the engine clamps CanvasPosition while the canvas shrinks, and a
+		-- search from the bottom would otherwise keep the old scroll.
+		if rows ~= last.rows then
+			list.CanvasSize = UDim2.fromOffset(0, rows * pitch)
+		end
 
-		local tall = asz(list).Y
-		local need = cols * (math.ceil(tall / (span + 16 + gap)) + 2)
+		local need = cols * (math.ceil(tall / pitch) + 2)
+		local top = math.max(math.floor(list.CanvasPosition.Y / pitch), 0)
+		local first = top * cols
+
+		-- Scrolling inside one row moves the canvas, not the pool. Bail out
+		-- before touching a single cell unless the row or the data changed.
+		if cols == last.cols and rows == last.rows and need == last.need
+			and first == last.first and pass == last.pass then
+			return
+		end
+
+		last.cols, last.rows, last.need, last.first, last.pass = cols, rows, need, first, pass
 
 		while #pool < need do
 			pool[#pool + 1] = makecell()
@@ -7313,9 +7587,6 @@ function ui.gallery(win, lane, cfg)
 			pool[i].entry = nil
 		end
 
-		local top = math.max(math.floor(list.CanvasPosition.Y / (span + 16 + gap)), 0)
-		local first = top * cols
-
 		for i = 1, need do
 			local slot = pool[i]
 			local index = first + i
@@ -7324,8 +7595,11 @@ function ui.gallery(win, lane, cfg)
 			if e then
 				local r = math.floor((index - 1) / cols)
 				local col = (index - 1) % cols
+				local pos = UDim2.fromOffset(col * (span + gap), r * pitch)
 
-				slot.frame.Position = UDim2.fromOffset(col * (span + gap), r * (span + 16 + gap))
+				if slot.frame.Position ~= pos then
+					slot.frame.Position = pos
+				end
 			end
 
 			dress(slot, e)
@@ -7333,6 +7607,7 @@ function ui.gallery(win, lane, cfg)
 	end
 
 	local function sieve()
+		pass += 1
 		table.clear(view)
 
 		if query == "" then
@@ -7993,5 +8268,10 @@ function visualsui:unload()
 end
 
 getgenv().visualsui = visualsui
+
+-- Glass is part of the surface hosts can reuse: the music HUD and the
+-- watermark draw with the same material as the menu.
+visualsui.glass = ui.glass
+visualsui.sheen = ui.sheen
 
 return visualsui
