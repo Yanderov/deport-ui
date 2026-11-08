@@ -3946,11 +3946,51 @@ function ui.floater(width, height)
 	return hull
 end
 
+local function liveview()
+	return workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
+end
+
+-- The last word on where a panel lands: never closer than 8 to the top or the
+-- left, never past the viewport on the other side. A trigger sitting on the
+-- right edge would otherwise keep its list hanging off the screen even after
+-- the flip.
+local function settle(hull, x, y, want)
+	local view = liveview()
+	local maxx = math.max(8, (view.X - 12) / sc - want.X)
+	local maxy = math.max(8, (view.Y - 12) / sc - want.Y)
+
+	hull.Position = UDim2.fromOffset(
+		math.clamp(math.floor(x), 8, math.floor(maxx)),
+		math.clamp(math.floor(y), 8, math.floor(maxy))
+	)
+end
+
+-- Put a ui.floater at a point, flipped when it would run off the bottom or the
+-- right edge. The panel is laid out at height zero and grown by ui.reveal, so
+-- its measured height is nothing at this point: the caller says how tall it is
+-- going to be, otherwise the vertical flip never fires and the panel opens off
+-- the bottom of the screen.
+function ui.place(hull, x, y, wide, tall)
+	local view = liveview()
+	local want = Vector2.new(wide or hull.AbsoluteSize.X / sc, tall or hull.AbsoluteSize.Y / sc)
+
+	if (y + want.Y) * sc > view.Y - 12 then
+		y -= want.Y
+	end
+
+	if (x + want.X) * sc > view.X - 12 then
+		x -= want.X
+	end
+
+	settle(hull, x, y, want)
+end
+
 -- Put a ui.floater on screen next to the control that opened it, flipped when
--- there is no room below or to the right.
-function ui.anchor(hull, at, size, gap)
-	local view = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
-	local want = hull.AbsoluteSize / sc
+-- there is no room below or to the right. `tall` is the height the panel is
+-- about to be revealed at, for the same reason as in ui.place.
+function ui.anchor(hull, at, size, gap, tall)
+	local view = liveview()
+	local want = Vector2.new(hull.AbsoluteSize.X / sc, tall or hull.AbsoluteSize.Y / sc)
 	local x = at.X
 	local y = at.Y + size.Y + (gap or 6)
 
@@ -3962,7 +4002,7 @@ function ui.anchor(hull, at, size, gap)
 		x = at.X + size.X - want.X
 	end
 
-	hull.Position = UDim2.fromOffset(math.max(8, math.floor(x)), math.max(8, math.floor(y)))
+	settle(hull, x, y, want)
 end
 
 function ui.reveal(hull, tall)
@@ -5102,7 +5142,7 @@ function ui.bindfor(win, row, title, opt)
 		visualsui:chime("tap")
 		paint()
 
-		ui.anchor(hull, apos(row), asz(row), 4)
+		ui.anchor(hull, apos(row), asz(row), 4, 134)
 		ui.reveal(hull, 134)
 
 		sky = bd.shut
@@ -5941,7 +5981,7 @@ function ui.attach(win, host)
 
 			hush(el)
 			sink()
-			ui.anchor(hull, apos(field), asz(field), 5)
+			ui.anchor(hull, apos(field), asz(field), 5, tall)
 			ui.reveal(hull, tall)
 			anim(chev, glide, { Rotation = 180 })
 
@@ -6296,7 +6336,7 @@ function ui.attach(win, host)
 
 			hush(el)
 			sink()
-			ui.anchor(hull, apos(chip), asz(chip), 5)
+			ui.anchor(hull, apos(chip), asz(chip), 5, 180)
 			ui.reveal(hull, 180)
 
 			sky = close
@@ -7711,7 +7751,7 @@ function visualsui:popup(cfg)
 
 	local at = Vector2.new(tonumber(cfg.x) or 0, tonumber(cfg.y) or 0)
 
-	ui.anchor(hull, at, Vector2.zero, 0)
+	ui.place(hull, at.X, at.Y, nil, math.min(tall, 320))
 	ui.reveal(hull, math.min(tall, 320))
 
 	sky = shut
