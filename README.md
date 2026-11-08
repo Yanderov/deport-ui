@@ -15,7 +15,7 @@ one or two columns under that.
 ## Using the library directly
 
 ```lua
-local lib = loadstring(game:HttpGet("https://raw.githubusercontent.com/<owner>/deport-ui/main/deport.luau"))()
+local lib = loadstring(game:HttpGet("https://raw.githubusercontent.com/Yanderov/deport-ui/main/deport.luau"))()
 
 local win = lib:window({ title = "Deport", build = "build: 1.0", size = UDim2.fromOffset(860, 600), bind = "RightShift" })
 
