@@ -4472,6 +4472,13 @@ function visualsui:window(cfg)
 		capsule.Visible = count > 1
 		capsule.Size = UDim2.fromOffset(math.max(count, 1) * 106, 34)
 
+		-- Every group's pages are parented to the one capsule, so the ones
+		-- belonging to the groups you are not on have to be put away; left
+		-- visible they all draw on top of each other.
+		for _, other in next, win.subs do
+			other.slot.Visible = other.owner == tab
+		end
+
 		for n, sub in next, tab.subs do
 			sub.slot.Parent = capsule
 			sub.slot.Position = UDim2.new((n - 1) / count, 0, 0, 0)
@@ -4632,6 +4639,7 @@ function visualsui:window(cfg)
 				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
 				Text = "",
+				Visible = false,
 				ZIndex = 5,
 			}, capsule)
 
