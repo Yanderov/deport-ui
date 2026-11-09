@@ -1351,6 +1351,16 @@ function visualsui:fontnames()
 	return out
 end
 
+-- GothamSemibold is not a face of its own on every client: some map it
+-- straight onto Medium, so a "semibold" label renders exactly like a plain
+-- one. Build the real SemiBold face once, so the labels that must stand
+-- apart (feature names, the chosen row) actually do.
+local SEMIBOLD = nil
+
+pcall(function()
+	SEMIBOLD = Font.new(Font.fromEnum(Enum.Font.GothamMedium).Family, Enum.FontWeight.SemiBold, Enum.FontStyle.Normal)
+end)
+
 local function refont(o)
 	if not (o:IsA("TextLabel") or o:IsA("TextButton") or o:IsA("TextBox")) then
 		return
@@ -1369,14 +1379,43 @@ local function refont(o)
 		return
 	end
 
+	if o:GetAttribute("semi") then
+		weight = Enum.FontWeight.SemiBold
+	end
+
 	if fontFamily then
 		o.FontFace = Font.new(fontFamily, weight)
+	elseif weight ~= FACE_WEIGHT[base] then
+		if SEMIBOLD then
+			o.FontFace = SEMIBOLD
+		else
+			o.Font = Enum.Font.GothamBold
+		end
 	elseif o.Font ~= base then
 		o.Font = base
 	end
 end
 
+-- a label that has to read a touch heavier than the rest
+local function semi(o)
+	fontBase[o] = Enum.Font.GothamMedium
+	o:SetAttribute("semi", true)
+
+	if SEMIBOLD then
+		o.FontFace = SEMIBOLD
+	else
+		o.Font = Enum.Font.GothamBold
+	end
+end
+
+local function plain(o)
+	o:SetAttribute("semi", nil)
+	o.Font = Enum.Font.GothamMedium
+end
+
 visualsui.refont = refont
+visualsui.semi = semi
+visualsui.plain = plain
 
 function visualsui:setfont(name)
 	local family = nil
@@ -5865,7 +5904,7 @@ function ui.attach(win, host)
 			AutomaticSize = Enum.AutomaticSize.X,
 			Size = UDim2.fromOffset(0, 16),
 			BackgroundTransparency = 1,
-			Font = Enum.Font.GothamSemibold,
+			Font = Enum.Font.GothamMedium,
 			Text = tostring(c.name),
 			TextColor3 = th.text,
 			TextSize = 12,
@@ -5923,9 +5962,10 @@ function ui.attach(win, host)
 		-- a function's name is the loudest thing on its row
 		local cap = caption(row, c.name, UDim2.new(1, c.options and -100 or -70, 0, 18))
 
-		cap.Font = Enum.Font.GothamSemibold
+		cap.Font = Enum.Font.GothamMedium
 		cap.TextSize = 13
 		cap.TextColor3 = on and th.text or th.dim
+		semi(cap)
 
 		local track = new("Frame", {
 			Name = rnd(),
@@ -6500,7 +6540,11 @@ function ui.attach(win, host)
 				anim(r.dot, soft, { ImageTransparency = on and 0 or 1 })
 				anim(r.text, soft, { TextColor3 = on and th.text or th.dim })
 
-				r.text.Font = on and Enum.Font.GothamSemibold or Enum.Font.GothamMedium
+				if on then
+					semi(r.text)
+				else
+					plain(r.text)
+				end
 			end
 		end
 
