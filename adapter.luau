@@ -50,10 +50,10 @@ function lib:retheme(map)
 	NeverLose.MainColor = self.theme.bg;
 end;
 
--- The old default was a neutral grey palette with a white accent. A config
--- saved under it would repaint the new black-blue menu grey on load, so a
--- palette that still matches that signature is replaced by the new default.
-local function legacyTheme(theme)
+-- The black-blue palette this build shipped for a while is not the menu's
+-- palette: a config saved under it would repaint the menu blue on load, so a
+-- theme that still matches that exact signature is replaced by the default.
+local function blueTheme(theme)
 	local accent, bg = theme.accent, theme.bg;
 
 	if type(accent) ~= "string" or type(bg) ~= "string" then return false end;
@@ -62,10 +62,8 @@ local function legacyTheme(theme)
 
 	if not ok or not a or not b then return false end;
 
-	local neutral = math.abs(a.R - a.G) < 0.03 and math.abs(a.G - a.B) < 0.03;
-
-	return neutral and a.R > 0.9 and b.R < 0.1
-		and math.abs(b.R - b.G) < 0.02 and math.abs(b.G - b.B) < 0.02;
+	return math.abs(a.R - 0.29) < 0.06 and math.abs(a.G - 0.565) < 0.06 and a.B > 0.94
+		and math.abs(b.R - 0.0235) < 0.02 and math.abs(b.G - 0.0353) < 0.02 and math.abs(b.B - 0.0627) < 0.02;
 end;
 
 -- Older configs saved a theme without palette flags. Keep the colour cards in
@@ -78,7 +76,7 @@ function lib:apply(data)
 
 	local source = data;
 
-	if legacyTheme(data.theme) then
+	if blueTheme(data.theme) then
 		source = table.clone(data);
 		source.flags = table.clone(data.flags);
 		source.theme = {};

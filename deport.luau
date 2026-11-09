@@ -97,24 +97,24 @@ local sc = visualsui.scale
 -- neutral gray so the blue accent reads as part of the surface instead of a
 -- sticker on top of it.
 visualsui.theme = {
-	bg = Color3.fromRGB(6, 9, 16),
-	side = Color3.fromRGB(10, 15, 26),
-	panel = Color3.fromRGB(14, 21, 35),
-	head = Color3.fromRGB(24, 35, 55),
-	line = Color3.fromRGB(44, 62, 92),
-	glow = Color3.fromRGB(96, 132, 196),
-	text = Color3.fromRGB(236, 243, 255),
-	dim = Color3.fromRGB(138, 154, 182),
-	accent = Color3.fromRGB(74, 144, 255),
+	bg = Color3.fromRGB(8, 8, 9),
+	side = Color3.fromRGB(13, 13, 14),
+	panel = Color3.fromRGB(18, 18, 19),
+	head = Color3.fromRGB(38, 38, 41),
+	line = Color3.fromRGB(66, 66, 70),
+	glow = Color3.fromRGB(132, 132, 136),
+	text = Color3.fromRGB(244, 244, 246),
+	dim = Color3.fromRGB(160, 160, 165),
+	accent = Color3.fromRGB(255, 255, 255),
 }
 
 visualsui.sheet = {
-	bg = Color3.fromRGB(14, 21, 35),
-	row = Color3.fromRGB(24, 35, 55),
-	press = Color3.fromRGB(36, 52, 80),
-	sep = Color3.fromRGB(44, 62, 92),
-	grab = Color3.fromRGB(96, 132, 196),
-	blue = Color3.fromRGB(74, 144, 255),
+	bg = Color3.fromRGB(22, 22, 23),
+	row = Color3.fromRGB(38, 38, 40),
+	press = Color3.fromRGB(54, 54, 56),
+	sep = Color3.fromRGB(66, 66, 69),
+	grab = Color3.fromRGB(104, 104, 108),
+	blue = Color3.fromRGB(255, 255, 255),
 }
 
 visualsui.icons = {
@@ -4400,10 +4400,13 @@ function visualsui:window(cfg)
 	}, shell)
 
 	-- Snow, drifting down the header and thinning out as it reaches the line.
-	-- One RenderStepped pass over sixteen flakes: no tweens, no per-flake
-	-- connections, and nothing runs while the menu is shut. Each flake fades
-	-- in over its first few pixels and out over its last few, so nothing pops
-	-- into existence and nothing lands hard on the line.
+	-- One RenderStepped pass over the flakes: no tweens, no per-flake
+	-- connections, and nothing runs while the menu is shut. Three depths keep
+	-- it from reading as a row of dots: far snow is small, slow and faint,
+	-- near snow is larger, faster and brighter, and every flake carries a soft
+	-- halo behind the core. Each one fades in over its first pixels and out
+	-- over its last, so nothing pops into existence and nothing lands hard on
+	-- the line.
 	do
 		local sky = new("Frame", {
 			Name = rnd(),
@@ -4414,33 +4417,64 @@ function visualsui:window(cfg)
 			ZIndex = 3,
 		}, shell)
 
-		local FLAKES, FLOOR = 16, 55
+		local FLAKES, FLOOR = 24, 55
 		local flakes = {}
 
 		local function respawn(f, fresh)
 			f.x = math.random()
-			f.y = fresh and math.random() * FLOOR or -math.random(2, 14)
-			f.speed = 10 + math.random() * 12
-			f.sway = 2.5 + math.random() * 5.5
+			f.y = fresh and math.random() * FLOOR or -math.random(2, 16)
 			f.phase = math.random() * 6.28
-			f.size = math.random(2, 3)
-			f.base = 0.3 + math.random() * 0.4
 
-			f.frame.Size = UDim2.fromOffset(f.size, f.size)
+			-- three depths, picked fresh each time a flake re-enters
+			local depth = math.random()
+
+			if depth < 0.34 then
+				f.size = 1.5 + math.random() * 0.8
+				f.speed = 6 + math.random() * 4
+				f.sway = 1.5 + math.random() * 2.5
+				f.base = 0.55 + math.random() * 0.2
+			elseif depth < 0.72 then
+				f.size = 2 + math.random() * 1
+				f.speed = 10 + math.random() * 5
+				f.sway = 2.5 + math.random() * 4
+				f.base = 0.3 + math.random() * 0.25
+			else
+				f.size = 2.6 + math.random() * 1.4
+				f.speed = 15 + math.random() * 7
+				f.sway = 4 + math.random() * 6
+				f.base = 0.12 + math.random() * 0.2
+			end
+
+			f.haloBase = math.min(f.base + 0.45, 0.95)
+
+			f.core.Size = UDim2.fromOffset(f.size, f.size)
+			f.halo.Size = UDim2.fromOffset(f.size * 2.4, f.size * 2.4)
 		end
 
 		for i = 1, FLAKES do
 			local f = {}
 
-			f.frame = new("Frame", {
+			f.halo = new("Frame", {
 				Name = rnd(),
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundColor3 = th.text,
+				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
 				ZIndex = 3,
 			}, sky)
 
-			new("UICorner", { CornerRadius = UDim.new(1, 0) }, f.frame)
+			new("UICorner", { CornerRadius = UDim.new(1, 0) }, f.halo)
+
+			f.core = new("Frame", {
+				Name = rnd(),
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundColor3 = th.text,
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				ZIndex = 3,
+			}, sky)
+
+			new("UICorner", { CornerRadius = UDim.new(1, 0) }, f.core)
 
 			respawn(f, true)
 			flakes[i] = f
@@ -4465,17 +4499,21 @@ function visualsui:window(cfg)
 					respawn(f, false)
 				end
 
-				local rise = math.clamp(f.y / 7, 0, 1)
-				local fall = math.clamp((FLOOR - f.y) / 5, 0, 1)
+				local rise = math.clamp(f.y / 8, 0, 1)
+				local fall = math.clamp((FLOOR - f.y) / 10, 0, 1)
 				local alpha = rise * fall
 
 				-- two slow sine waves instead of one: a single wave reads as a
 				-- metronome, two make the drift look like air
-				local drift = math.sin(clock * 0.8 + f.phase) * f.sway
-					+ math.sin(clock * 0.31 + f.phase * 1.7) * f.sway * 0.35
+				local drift = math.sin(clock * 0.7 + f.phase) * f.sway
+					+ math.sin(clock * 0.27 + f.phase * 1.7) * f.sway * 0.4
 
-				f.frame.Position = UDim2.new(f.x, drift, 0, f.y)
-				f.frame.BackgroundTransparency = math.clamp(1 - alpha * (1 - f.base), 0, 1)
+				local spot = UDim2.new(f.x, drift, 0, f.y)
+
+				f.core.Position = spot
+				f.halo.Position = spot
+				f.core.BackgroundTransparency = math.clamp(1 - alpha * (1 - f.base), 0, 1)
+				f.halo.BackgroundTransparency = math.clamp(1 - alpha * (1 - f.haloBase), 0, 1)
 			end
 		end)
 	end
