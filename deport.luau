@@ -329,10 +329,12 @@ end
 local quick = TweenInfo.new(0.09, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local glide = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local soft = TweenInfo.new(0.24, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
--- iOS sheets settle rather than stop: a short spring on scale, and a longer
--- ease-out on size so a panel grows past the finger and eases into place.
-local spring = TweenInfo.new(0.34, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-local swell = TweenInfo.new(0.30, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+-- The motion language: things arrive on a long ease-out, leave on a short
+-- ease-in, and a highlight that follows the selection glides on the same
+-- curve it arrived on. Nothing overshoots.
+local arrive = TweenInfo.new(0.30, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+local depart = TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+local follow = TweenInfo.new(0.34, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
 
 local function rnd()
@@ -517,13 +519,6 @@ end
 
 local function inq(t)
 	return t * t
-end
-
--- easeOutBack: a small overshoot then a settle. Used for scale, never for
--- height, so a panel does not clip its own content while it springs.
-local function spry(t)
-	local s = t - 1
-	return 1 + 2.24 * s * s * s + 1.24 * s * s
 end
 
 local function flow(o, dur, curve, step, lag)
@@ -3499,7 +3494,7 @@ local shelf = new("Frame", {
 	Name = rnd(),
 	AnchorPoint = Vector2.new(0, 0),
 	Position = UDim2.new(0, 18, 0, 18),
-	Size = UDim2.fromOffset(268, 0),
+	Size = UDim2.fromOffset(252, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 	BackgroundTransparency = 1,
 	ZIndex = 400,
@@ -3554,17 +3549,18 @@ function visualsui:notify(cfg)
 	})
 
 	local th = visualsui.theme
-	local wide = 268
+	local wide = 252
 	local head = tostring(cfg.title or "")
 	local body = tostring(cfg.text or "")
-	local tint = (typeof(cfg.tone) == "Color3") and cfg.tone or th.accent
+	-- monochrome unless a caller asks for a tone, and then only the glyph wears it
+	local tint = (typeof(cfg.tone) == "Color3") and cfg.tone or th.text
 	local rows = 0
 
 	if body ~= "" then
-		rows = math.clamp(math.ceil(gauge(body, 11) / (wide - 52)), 1, 4)
+		rows = math.clamp(math.ceil(gauge(body, 11) / (wide - 58)), 1, 4)
 	end
 
-	local tall = 27 + (rows > 0 and (rows * 12 + 3) or 0)
+	local tall = (rows > 0) and (38 + rows * 13 + 4) or 38
 
 	puffn += 1
 
@@ -3572,107 +3568,68 @@ function visualsui:notify(cfg)
 		Name = rnd(),
 		Size = UDim2.fromOffset(wide, tall),
 		BackgroundColor3 = th.panel,
-		BackgroundTransparency = 0,
+		BackgroundTransparency = 0.18,
 		BorderSizePixel = 0,
 		GroupTransparency = 1,
 		LayoutOrder = puffn,
 		ZIndex = 400,
 	}, shelf)
 
-	round(husk, 7)
+	round(husk, math.min(14, tall / 2))
 
 	new("UIStroke", {
 		Color = th.line,
 		Thickness = 1,
-		Transparency = 0.45,
+		Transparency = 0.4,
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 		LineJoinMode = Enum.LineJoinMode.Round,
 	}, husk)
 
-	if deep then
-		new("UIShadow", {
-			Color = th.bg,
-			BlurRadius = UDim.new(0, 14),
-			Offset = UDim2.fromOffset(0, 3),
-			Spread = UDim2.fromOffset(-2, -2),
-			Transparency = 0.3,
-			ZIndex = -1,
-		}, husk)
-	end
+	visualsui.glass(husk, math.min(14, tall / 2), { lift = 16, shade = th.bg, washTransparency = 0.9, z = 400 })
 
-	local sheen = new("Frame", {
+	-- the glyph sits on a small glass disc, centred on the first line
+	local disc = new("Frame", {
 		Name = rnd(),
-		Size = UDim2.fromScale(1, 1),
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 10, 0, 19),
+		Size = UDim2.fromOffset(22, 22),
 		BackgroundColor3 = th.glow,
-		BackgroundTransparency = 0.82,
-		BorderSizePixel = 0,
-		ZIndex = 400,
-	}, husk)
-
-	round(sheen, 7)
-
-	fade(sheen, 90, {
-		NumberSequenceKeypoint.new(0, 0.5),
-		NumberSequenceKeypoint.new(0.6, 0.82),
-		NumberSequenceKeypoint.new(1, 0.9),
-	})
-
-	local gloss = new("Frame", {
-		Name = rnd(),
-		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, 1),
-		Size = UDim2.new(1, -14, 0, 1),
-		BackgroundColor3 = th.glow,
-		BackgroundTransparency = 0.7,
+		BackgroundTransparency = 0.84,
 		BorderSizePixel = 0,
 		ZIndex = 402,
 	}, husk)
 
-	fade(gloss, 0, {
-		NumberSequenceKeypoint.new(0, 1),
-		NumberSequenceKeypoint.new(0.5, 0.1),
-		NumberSequenceKeypoint.new(1, 1),
-	})
+	new("UICorner", { CornerRadius = UDim.new(1, 0) }, disc)
 
-	local bar = new("Frame", {
-		Name = rnd(),
-		Size = UDim2.new(0, 2, 1, 0),
-		BackgroundColor3 = tint,
-		BackgroundTransparency = 0.15,
-		BorderSizePixel = 0,
-		ZIndex = 402,
-	}, husk)
-
-	fade(bar, 90, {
-		NumberSequenceKeypoint.new(0, 1),
-		NumberSequenceKeypoint.new(0.12, 0.2),
-		NumberSequenceKeypoint.new(0.5, 0),
-		NumberSequenceKeypoint.new(0.88, 0.2),
-		NumberSequenceKeypoint.new(1, 1),
-	})
+	new("UIStroke", {
+		Color = th.glow,
+		Thickness = 1,
+		Transparency = 0.7,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+	}, disc)
 
 	new("ImageLabel", {
 		Name = rnd(),
-		Position = UDim2.fromOffset(11, 7),
-		Size = UDim2.fromOffset(13, 13),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(12, 12),
 		BackgroundTransparency = 1,
 		Image = icon(cfg.icon),
 		ImageColor3 = tint,
-		ImageTransparency = 0.05,
 		ScaleType = Enum.ScaleType.Fit,
-		ZIndex = 402,
-	}, husk)
+		ZIndex = 403,
+	}, disc)
 
 	new("TextLabel", {
 		Name = rnd(),
-		Position = UDim2.fromOffset(31, 5),
-		Size = UDim2.new(1, -46, 0, 17),
+		AnchorPoint = Vector2.new(0, 0),
+		Position = UDim2.fromOffset(42, 10),
+		Size = UDim2.new(1, -54, 0, 18),
 		BackgroundTransparency = 1,
-		Font = Enum.Font.GothamMedium,
+		Font = Enum.Font.GothamBold,
 		Text = head,
 		TextColor3 = th.text,
 		TextSize = 13,
-		TextTransparency = 0.05,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		ZIndex = 402,
@@ -3681,14 +3638,13 @@ function visualsui:notify(cfg)
 	if rows > 0 then
 		new("TextLabel", {
 			Name = rnd(),
-			Position = UDim2.fromOffset(31, 21),
-			Size = UDim2.new(1, -42, 0, rows * 12),
+			Position = UDim2.fromOffset(42, 28),
+			Size = UDim2.new(1, -54, 0, rows * 13),
 			BackgroundTransparency = 1,
 			Font = Enum.Font.GothamMedium,
 			Text = body,
 			TextColor3 = th.dim,
 			TextSize = 11,
-			TextTransparency = 0.15,
 			TextWrapped = true,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			TextYAlignment = Enum.TextYAlignment.Top,
@@ -3696,24 +3652,17 @@ function visualsui:notify(cfg)
 		}, husk)
 	end
 
+	-- time left, as a hairline under the card that runs down to nothing
 	local fuse = new("Frame", {
 		Name = rnd(),
-		AnchorPoint = Vector2.new(0, 1),
-		Position = UDim2.fromScale(0, 1),
-		Size = UDim2.new(1, 0, 0, 2),
-		BackgroundColor3 = tint,
-		BackgroundTransparency = 0.35,
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -4),
+		Size = UDim2.new(1, -28, 0, 1),
+		BackgroundColor3 = th.glow,
+		BackgroundTransparency = 0.55,
 		BorderSizePixel = 0,
 		ZIndex = 403,
 	}, husk)
-
-	fade(fuse, 0, {
-		NumberSequenceKeypoint.new(0, 1),
-		NumberSequenceKeypoint.new(0.12, 0.2),
-		NumberSequenceKeypoint.new(0.5, 0),
-		NumberSequenceKeypoint.new(0.88, 0.2),
-		NumberSequenceKeypoint.new(1, 1),
-	})
 
 	local shut = new("ImageButton", {
 		Name = rnd(),
@@ -3723,12 +3672,17 @@ function visualsui:notify(cfg)
 		ZIndex = 404,
 	}, husk)
 
+	local push = new("UIScale", { Scale = 0.96 }, husk)
+
 	local function drift(inn, done)
 		local a0 = husk.GroupTransparency
 		local a1 = inn and 0 or 1
+		local s0 = push.Scale
+		local s1 = inn and 1 or 0.97
 
-		flow(husk, inn and 0.3 or 0.22, inn and outq or inq, function(k)
+		flow(husk, inn and 0.30 or 0.16, inn and outq or inq, function(k)
 			husk.GroupTransparency = a0 + (a1 - a0) * k
+			push.Scale = s0 + (s1 - s0) * k
 
 			if k >= 1 and done then
 				done()
@@ -3784,18 +3738,18 @@ function visualsui:notify(cfg)
 	end)
 
 	conn(shut.MouseEnter, function()
-		anim(sheen, soft, { BackgroundTransparency = 0.65 })
+		anim(disc, soft, { BackgroundTransparency = 0.7 })
 	end)
 
 	conn(shut.MouseLeave, function()
-		anim(sheen, soft, { BackgroundTransparency = 0.82 })
+		anim(disc, soft, { BackgroundTransparency = 0.84 })
 	end)
 
 	drift(true)
 
 	local life = math.max(tonumber(cfg.life) or 5, 0.4)
 
-	anim(fuse, TweenInfo.new(life, Enum.EasingStyle.Linear), { Size = UDim2.new(0, 0, 0, 2) })
+	anim(fuse, TweenInfo.new(life, Enum.EasingStyle.Linear), { Size = UDim2.new(0, 0, 0, 1) })
 
 	task.delay(life, function()
 		puff:close()
@@ -3816,24 +3770,22 @@ function visualsui.linkhead(head)
 
 	table.clear(head.links)
 
-	local th = visualsui.theme
-
 	for n, l in next, visualsui.linklist do
-		local b = head.button(head.quest, 28)
+		-- the artwork is drawn centred on its own canvas at one optical size, so
+		-- every glyph takes the same box and none needs an offset
+		local b, art = head.button(head.quest, 28, l.image or "", 17)
 
-		b.Position = UDim2.new(1, -(n * 38), 0, 14)
+		b.Position = UDim2.new(1, -(n * 32), 0, 14)
+		art.ImageColor3 = visualsui.theme.text
+		art.ImageTransparency = 0.18
 
-		new("ImageLabel", {
-			Name = rnd(),
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.fromOffset(15, 15),
-			BackgroundTransparency = 1,
-			Image = l.image or "",
-			ImageColor3 = th.dim,
-			ScaleType = Enum.ScaleType.Fit,
-			ZIndex = 7,
-		}, b)
+		conn(b.MouseEnter, function()
+			anim(art, soft, { ImageTransparency = 0 })
+		end)
+
+		conn(b.MouseLeave, function()
+			anim(art, soft, { ImageTransparency = 0.18 })
+		end)
 
 		conn(b.MouseButton1Click, function()
 			visualsui:chime("tap")
@@ -3876,7 +3828,12 @@ end
 -- A row is the one shape every control shares: a ui.caption on the left, the
 -- control itself hugging the right edge. Height is the only thing that
 -- varies, so it is the only thing a caller passes.
-function ui.rowframe(parent, height, order)
+-- Every row keeps the same inset, so captions and controls share one left and
+-- one right edge down a card. A toggle opts out: its lit plate runs the whole
+-- width and it sets the same inset by hand inside it.
+ui.INSET = 10
+
+function ui.rowframe(parent, height, order, flush)
 	local row = new("Frame", {
 		Name = rnd(),
 		Size = UDim2.new(1, 0, 0, height or 26),
@@ -3884,6 +3841,13 @@ function ui.rowframe(parent, height, order)
 		BorderSizePixel = 0,
 		LayoutOrder = order or 1,
 	}, parent)
+
+	if not flush then
+		new("UIPadding", {
+			PaddingLeft = UDim.new(0, ui.INSET),
+			PaddingRight = UDim.new(0, ui.INSET),
+		}, row)
+	end
 
 	return row
 end
@@ -4065,6 +4029,75 @@ end
 -- A floating layer: the dropdown lists, the colour panels, the context
 -- menus. One is open at a time and a click anywhere else shuts it, which is
 -- what sky/skyzone above already arrange.
+-- A glass highlight that slides to whichever item is selected, so a change of
+-- tab reads as one object moving instead of two things swapping.
+function ui.glider(parent, radius, z)
+	local th = ui.palette()
+
+	local frame = new("Frame", {
+		Name = rnd(),
+		BackgroundColor3 = th.glow,
+		BackgroundTransparency = 0.78,
+		BorderSizePixel = 0,
+		Visible = false,
+		ZIndex = z or 1,
+	}, parent)
+
+	round(frame, radius)
+
+	new("UIStroke", {
+		Color = th.glow,
+		Thickness = 1,
+		Transparency = 0.6,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+	}, frame)
+
+	fade(frame, 90, {
+		NumberSequenceKeypoint.new(0, 0.1),
+		NumberSequenceKeypoint.new(1, 0.55),
+	})
+
+	local rim = new("Frame", {
+		Name = rnd(),
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 1),
+		Size = UDim2.new(1, -radius * 1.6, 0, 1),
+		BackgroundColor3 = th.text,
+		BackgroundTransparency = 0.5,
+		BorderSizePixel = 0,
+		ZIndex = (z or 1) + 1,
+	}, frame)
+
+	fade(rim, 0, {
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(0.5, 0),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+
+	local api = { frame = frame, placed = false }
+
+	function api.to(position, size)
+		if not api.placed then
+			-- the first placement is a cut, not a slide in from nowhere
+			frame.Position = position
+			frame.Size = size
+			frame.Visible = true
+			api.placed = true
+
+			return
+		end
+
+		anim(frame, follow, { Position = position, Size = size })
+	end
+
+	function api.hide()
+		frame.Visible = false
+		api.placed = false
+	end
+
+	return api
+end
+
 function ui.floater(width, height)
 	local th = ui.palette()
 
@@ -4072,7 +4105,7 @@ function ui.floater(width, height)
 		Name = rnd(),
 		Size = UDim2.fromOffset(width, height),
 		BackgroundColor3 = ui.sheet.bg,
-		BackgroundTransparency = 0.04,
+		BackgroundTransparency = 0.08,
 		BorderSizePixel = 0,
 		ClipsDescendants = true,
 		Visible = false,
@@ -4159,27 +4192,42 @@ function ui.reveal(hull, tall)
 	hull.Visible = true
 	hull.Size = UDim2.new(hull.Size.X.Scale, hull.Size.X.Offset, 0, 0)
 
-	-- The height grows on an ease-out; the surface itself springs up from
-	-- just under full size, which is what gives the panel its weight.
 	local scale = hull:FindFirstChildOfClass("UIScale")
 
 	if not scale then
 		scale = new("UIScale", { Scale = 1 }, hull)
 	end
 
-	local base = scale.Scale
+	-- the same entrance as the window: a little under full size, fading in
+	scale.Scale = 0.97
+	hull.BackgroundTransparency = 0.7
 
-	scale.Scale = base * 0.94
-	anim(scale, spring, { Scale = base })
-	anim(hull, swell, { Size = UDim2.new(hull.Size.X.Scale, hull.Size.X.Offset, 0, tall) })
+	anim(scale, arrive, { Scale = 1 })
+	anim(hull, arrive, {
+		Size = UDim2.new(hull.Size.X.Scale, hull.Size.X.Offset, 0, tall),
+		BackgroundTransparency = 0.08,
+	})
 end
 
 function ui.conceal(hull, done)
-	anim(hull, quick, { Size = UDim2.new(hull.Size.X.Scale, hull.Size.X.Offset, 0, 0) })
+	local scale = hull:FindFirstChildOfClass("UIScale")
 
-	task.delay(0.1, function()
+	if scale then
+		anim(scale, depart, { Scale = 0.98 })
+	end
+
+	anim(hull, depart, {
+		Size = UDim2.new(hull.Size.X.Scale, hull.Size.X.Offset, 0, 0),
+		BackgroundTransparency = 1,
+	})
+
+	task.delay(0.17, function()
 		if hull.Parent then
 			hull.Visible = false
+
+			if scale then
+				scale.Scale = 1
+			end
 		end
 
 		if done then
@@ -4258,7 +4306,7 @@ function visualsui:window(cfg)
 		Position = UDim2.fromScale(0.5, 0.5),
 		Size = win.size,
 		BackgroundColor3 = th.bg,
-		BackgroundTransparency = 0,
+		BackgroundTransparency = 0.2,
 		BorderSizePixel = 0,
 		ClipsDescendants = true,
 		GroupTransparency = 1,
@@ -4398,38 +4446,14 @@ function visualsui:window(cfg)
 		ZIndex = 5,
 	}, header)
 
-	-- a figure stepping out of a doorway; drawn by Tools/make_exit_icon.py and
-	-- shipped in the asset pack, with the plain door-and-arrow as the fallback
-	-- for a run that has no packs
-	local mark = new("ImageLabel", {
-		Name = rnd(),
-		Position = UDim2.fromOffset(0, 3),
-		Size = UDim2.fromOffset(18, 18),
-		BackgroundTransparency = 1,
-		Image = icon("log-out"),
-		ImageColor3 = th.text,
-		ScaleType = Enum.ScaleType.Fit,
-		ZIndex = 5,
-	}, brand)
-
-	task.spawn(function()
-		local art = asset({ "images/icon_exit.png" })
-
-		if art ~= "" and mark.Parent then
-			mark.Image = art
-		end
-	end)
-
 	new("TextLabel", {
 		Name = rnd(),
-		Position = UDim2.fromOffset(24, 0),
-		Size = UDim2.new(1, -24, 1, 0),
+		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
 		Font = Enum.Font.GothamBold,
 		Text = tostring(cfg.title),
 		TextColor3 = th.text,
 		TextSize = 17,
-		TextXAlignment = Enum.TextXAlignment.Left,
 		ZIndex = 5,
 	}, brand)
 
@@ -4443,37 +4467,58 @@ function visualsui:window(cfg)
 		ZIndex = 6,
 	}, header)
 
-	local function headbutton(parent, width)
+	-- A bare glyph with nothing behind it; a round glass disc fades in under
+	-- the pointer. Every header button is made here so they all behave alike.
+	local function headbutton(parent, width, glyph, size)
 		local b = new("TextButton", {
 			Name = rnd(),
 			AnchorPoint = Vector2.new(1, 0),
 			Position = UDim2.new(1, 0, 0, 14),
-			Size = UDim2.fromOffset(width, 30),
-			BackgroundColor3 = th.head,
-			BackgroundTransparency = 0.18,
+			Size = UDim2.fromOffset(width, width),
+			BackgroundColor3 = th.glow,
+			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Text = "",
 			ZIndex = 6,
 		}, parent)
 
-		round(b, 10)
-		ui.warmth(b, b, th.head, th.line)
+		round(b, width)
 
-		return b
+		local edge = new("UIStroke", {
+			Color = th.glow,
+			Thickness = 1,
+			Transparency = 1,
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+		}, b)
+
+		local art = new("ImageLabel", {
+			Name = rnd(),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(size or 14, size or 14),
+			BackgroundTransparency = 1,
+			Image = glyph or "",
+			ImageColor3 = th.dim,
+			ScaleType = Enum.ScaleType.Fit,
+			ZIndex = 7,
+		}, b)
+
+		conn(b.MouseEnter, function()
+			anim(b, soft, { BackgroundTransparency = 0.86 })
+			anim(edge, soft, { Transparency = 0.6 })
+			anim(art, soft, { ImageColor3 = th.text })
+		end)
+
+		conn(b.MouseLeave, function()
+			anim(b, soft, { BackgroundTransparency = 1 })
+			anim(edge, soft, { Transparency = 1 })
+			anim(art, soft, { ImageColor3 = th.dim })
+		end)
+
+		return b, art
 	end
 
-	local close = headbutton(quest, 28)
-
-	new("TextLabel", {
-		Name = rnd(),
-		Size = UDim2.fromScale(1, 1),
-		BackgroundTransparency = 1,
-		Font = Enum.Font.Gotham,
-		Text = "\u{00D7}",
-		TextColor3 = th.dim,
-		TextSize = 23,
-		ZIndex = 7,
-	}, close)
+	local close = headbutton(quest, 28, icon("x"), 13)
 
 	conn(close.MouseButton1Click, function()
 		visualsui:chime("close")
@@ -4510,6 +4555,8 @@ function visualsui:window(cfg)
 
 	ui.glass(capsule, 11, { lift = 10, washTransparency = 0.9, z = 1 })
 
+	local capglider = ui.glider(capsule, 8, 2)
+
 	-- --------------------------------------------------------- content ----
 	local board = new("Frame", {
 		Name = rnd(),
@@ -4521,6 +4568,7 @@ function visualsui:window(cfg)
 	}, shell)
 
 	-- ------------------------------------------------------ bottom bar ----
+	-- The groups sit on one glass dock; a highlight slides to the open one.
 	local bar = new("Frame", {
 		Name = rnd(),
 		AnchorPoint = Vector2.new(0, 1),
@@ -4530,13 +4578,32 @@ function visualsui:window(cfg)
 		ZIndex = 4,
 	}, shell)
 
-	new("UIListLayout", {
-		FillDirection = Enum.FillDirection.Horizontal,
-		HorizontalAlignment = Enum.HorizontalAlignment.Center,
-		VerticalAlignment = Enum.VerticalAlignment.Center,
-		SortOrder = Enum.SortOrder.LayoutOrder,
-		Padding = UDim.new(0, 24),
+	local dock = new("Frame", {
+		Name = rnd(),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0.5, -2),
+		Size = UDim2.fromOffset(8, 42),
+		BackgroundColor3 = th.panel,
+		BackgroundTransparency = 0.3,
+		BorderSizePixel = 0,
+		ZIndex = 4,
 	}, bar)
+
+	round(dock, 15)
+
+	new("UIStroke", {
+		Color = th.line,
+		Thickness = 1,
+		Transparency = 0.45,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+		LineJoinMode = Enum.LineJoinMode.Round,
+	}, dock)
+
+	ui.glass(dock, 15, { washTransparency = 0.92, z = 4 })
+
+	local dockglider = ui.glider(dock, 11, 5)
+
+	local TAB_W, TAB_H, TAB_GAP, TAB_PAD = 104, 34, 2, 4
 
 	-- ----------------------------------------------------- page plumbing ----
 	-- A page is a scrolling board with a full-width lane on top and a pair of
@@ -4703,10 +4770,30 @@ function visualsui:window(cfg)
 
 			local on = win.active == sub
 
-			sub.glow.BackgroundTransparency = on and 0 or 1
 			anim(sub.art, glide, { ImageColor3 = on and th.text or th.dim })
 			anim(sub.tag, glide, { TextColor3 = on and th.text or th.dim })
+
+			if on then
+				capglider.to(UDim2.new((n - 1) / count, 3, 0, 3), UDim2.new(1 / count, -6, 1, -6))
+			end
 		end
+	end
+
+	-- Tabs are placed by hand, in LayoutOrder order, so the dock knows its own
+	-- width and the highlight knows exactly where to go.
+	local function relayout()
+		local order = table.clone(win.list)
+
+		table.sort(order, function(a, b)
+			return a.head.LayoutOrder < b.head.LayoutOrder
+		end)
+
+		for n, tab in next, order do
+			tab.slotpos = UDim2.fromOffset(TAB_PAD + (n - 1) * (TAB_W + TAB_GAP), TAB_PAD)
+			tab.head.Position = tab.slotpos
+		end
+
+		dock.Size = UDim2.fromOffset(TAB_PAD * 2 + #order * TAB_W + math.max(#order - 1, 0) * TAB_GAP, 42)
 	end
 
 	local function paintbar()
@@ -4715,7 +4802,10 @@ function visualsui:window(cfg)
 
 			anim(tab.art, glide, { ImageColor3 = on and th.text or th.dim })
 			anim(tab.tag, glide, { TextColor3 = on and th.text or th.dim })
-			anim(tab.mark, glide, { BackgroundTransparency = on and 0 or 1 })
+
+			if on and tab.slotpos then
+				dockglider.to(tab.slotpos, UDim2.fromOffset(TAB_W, TAB_H))
+			end
 		end
 	end
 
@@ -4785,55 +4875,62 @@ function visualsui:window(cfg)
 
 		local btn = new("TextButton", {
 			Name = rnd(),
-			Size = UDim2.fromOffset(100, 34),
+			Size = UDim2.fromOffset(TAB_W, TAB_H),
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Text = "",
 			LayoutOrder = #win.list + 1,
-			ZIndex = 5,
-		}, bar)
+			ZIndex = 6,
+		}, dock)
+
+		local strip = new("Frame", {
+			Name = rnd(),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.new(1, -16, 0, 20),
+			BackgroundTransparency = 1,
+			ZIndex = 6,
+		}, btn)
+
+		new("UIListLayout", {
+			FillDirection = Enum.FillDirection.Horizontal,
+			HorizontalAlignment = Enum.HorizontalAlignment.Center,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Padding = UDim.new(0, 7),
+		}, strip)
 
 		tab.art = new("ImageLabel", {
 			Name = rnd(),
-			Position = UDim2.fromOffset(6, 9),
-			Size = UDim2.fromOffset(16, 16),
+			Size = UDim2.fromOffset(15, 15),
 			BackgroundTransparency = 1,
 			Image = icon(c.icon),
 			ImageColor3 = th.dim,
 			ScaleType = Enum.ScaleType.Fit,
-			ZIndex = 5,
-		}, btn)
+			LayoutOrder = 1,
+			ZIndex = 6,
+		}, strip)
 
 		tab.tag = new("TextLabel", {
 			Name = rnd(),
-			Position = UDim2.fromOffset(30, 0),
-			Size = UDim2.new(1, -30, 1, 0),
+			AutomaticSize = Enum.AutomaticSize.X,
+			Size = UDim2.fromOffset(0, 20),
 			BackgroundTransparency = 1,
 			Font = Enum.Font.GothamMedium,
 			Text = ui.titlecase(c.name),
 			TextColor3 = th.dim,
 			TextSize = 13,
-			TextTruncate = Enum.TextTruncate.AtEnd,
-			TextXAlignment = Enum.TextXAlignment.Left,
-			ZIndex = 5,
-		}, btn)
-
-		-- the only thing that marks the group you are on
-		tab.mark = new("Frame", {
-			Name = rnd(),
-			AnchorPoint = Vector2.new(0.5, 1),
-			Position = UDim2.new(0.5, 0, 1, 2),
-			Size = UDim2.fromOffset(18, 2),
-			BackgroundColor3 = th.accent,
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-			ZIndex = 5,
-		}, btn)
-
-		round(tab.mark, 1)
+			LayoutOrder = 2,
+			ZIndex = 6,
+		}, strip)
 
 		tab.head = btn
 		tab.button = btn
+
+		conn(btn:GetPropertyChangedSignal("LayoutOrder"), function()
+			relayout()
+			paintbar()
+		end)
 
 		conn(btn.MouseButton1Click, function()
 			visualsui:chime("tap")
@@ -4861,18 +4958,6 @@ function visualsui:window(cfg)
 			}, capsule)
 
 			sub.slot = slot
-
-			sub.glow = new("Frame", {
-				Name = rnd(),
-				Position = UDim2.fromOffset(3, 3),
-				Size = UDim2.new(1, -6, 1, -6),
-				BackgroundColor3 = th.line,
-				BackgroundTransparency = 1,
-				BorderSizePixel = 0,
-				ZIndex = 5,
-			}, slot)
-
-			round(sub.glow, 8)
 
 			local strip = new("Frame", {
 				Name = rnd(),
@@ -4947,6 +5032,8 @@ function visualsui:window(cfg)
 
 		table.insert(win.list, tab)
 
+		relayout()
+
 		if not win.active then
 			pick(tab)
 		end
@@ -4976,17 +5063,16 @@ function visualsui:window(cfg)
 
 		local from = shell.GroupTransparency
 		local to = want and 0 or 1
-		local sfrom = want and 0.94 or pop.Scale
-		local sto = want and 1 or 0.96
+		-- Opacity and scale ride one curve: in on a long ease-out, out on a
+		-- short ease-in, so opening and closing read as the same gesture.
+		local sfrom = want and 0.965 or pop.Scale
+		local sto = want and 1 or 0.975
 
-		-- Opacity eases out; scale springs so the window lands with a little
-		-- weight instead of stopping dead.
-		flow(shell, want and 0.34 or 0.16, function(t) return t end, function(t)
+		flow(shell, want and 0.30 or 0.16, function(t) return t end, function(t)
 			local a = want and outq(t) or inq(t)
-			local s = want and spry(t) or t
 
 			shell.GroupTransparency = from + (to - from) * a
-			pop.Scale = sfrom + (sto - sfrom) * s
+			pop.Scale = sfrom + (sto - sfrom) * a
 
 			if t >= 1 and not win.open then
 				shell.Visible = false
@@ -5510,16 +5596,59 @@ function ui.attach(win, host)
 	function api:toggle(c)
 		c = params(c, { name = "Toggle", default = false, options = false, flag = nil, callback = nil })
 
-		local row = ui.rowframe(host, 26, order())
-		local cap = caption(row, c.name, UDim2.new(1, c.options and -82 or -56, 0, 16))
+		local row = ui.rowframe(host, 30, order(), true)
 		local on = c.default and true or false
 
+		-- A lit function wears a plate of its own: a little lighter, a firmer
+		-- edge and a rim of light along the top. Off, the plate is not there at
+		-- all, so the difference reads at a glance and never shouts.
+		local plate = new("Frame", {
+			Name = rnd(),
+			Size = UDim2.fromScale(1, 1),
+			BackgroundColor3 = th.glow,
+			BackgroundTransparency = on and 0.9 or 1,
+			BorderSizePixel = 0,
+		}, row)
+
+		round(plate, 9)
+
+		local plateEdge = new("UIStroke", {
+			Color = th.glow,
+			Thickness = 1,
+			Transparency = on and 0.62 or 1,
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+		}, plate)
+
+		fade(plate, 90, {
+			NumberSequenceKeypoint.new(0, 0.1),
+			NumberSequenceKeypoint.new(1, 0.6),
+		})
+
+		local plateRim = new("Frame", {
+			Name = rnd(),
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.new(0.5, 0, 0, 1),
+			Size = UDim2.new(1, -18, 0, 1),
+			BackgroundColor3 = th.text,
+			BackgroundTransparency = on and 0.55 or 1,
+			BorderSizePixel = 0,
+		}, plate)
+
+		fade(plateRim, 0, {
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.5, 0),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+
+		local cap = caption(row, c.name, UDim2.new(1, c.options and -96 or -72, 0, 16))
+
+		cap.Position = UDim2.new(0, ui.INSET, 0.5, 0)
 		cap.TextColor3 = on and th.text or th.dim
 
 		local track = new("Frame", {
 			Name = rnd(),
 			AnchorPoint = Vector2.new(1, 0.5),
-			Position = UDim2.new(1, 0, 0.5, 0),
+			Position = UDim2.new(1, -ui.INSET, 0.5, 0),
 			Size = UDim2.fromOffset(34, 18),
 			BackgroundColor3 = on and th.accent or th.head,
 			BorderSizePixel = 0,
@@ -5555,6 +5684,9 @@ function ui.attach(win, host)
 				BackgroundColor3 = on and th.bg or th.text,
 			})
 			anim(cap, glide, { TextColor3 = on and th.text or th.dim })
+			anim(plate, soft, { BackgroundTransparency = on and 0.9 or 1 })
+			anim(plateEdge, soft, { Transparency = on and 0.62 or 1 })
+			anim(plateRim, soft, { BackgroundTransparency = on and 0.55 or 1 })
 
 			-- rawget: reading el.options would build the panel, and most
 			-- toggles never have one
@@ -5585,6 +5717,14 @@ function ui.attach(win, host)
 		end
 
 		local hit = ui.hitbox(row)
+
+		conn(hit.MouseEnter, function()
+			anim(plate, soft, { BackgroundTransparency = on and 0.85 or 0.95 })
+		end)
+
+		conn(hit.MouseLeave, function()
+			anim(plate, soft, { BackgroundTransparency = on and 0.9 or 1 })
+		end)
 
 		conn(hit.MouseButton1Click, function()
 			visualsui:chime("tap")
@@ -5638,7 +5778,7 @@ function ui.attach(win, host)
 				local dots = new("ImageButton", {
 					Name = rnd(),
 					AnchorPoint = Vector2.new(1, 0.5),
-					Position = UDim2.new(1, -42, 0.5, 0),
+					Position = UDim2.new(1, -52, 0.5, 0),
 					Size = UDim2.fromOffset(18, 18),
 					BackgroundColor3 = th.head,
 					BackgroundTransparency = 1,
@@ -7421,20 +7561,18 @@ function ui.gallery(win, lane, cfg)
 			end
 		end
 
+		-- A picked cell is lighter, rimmed in brighter glass, and its name reads
+		-- at full strength. Nothing is added to it: no badge, no tick.
 		local on = chosen(e.name)
-		local edge = on and th.accent or th.line
-		local alpha = on and 0 or 0.6
 
-		if slot.edge.Color ~= edge then
-			slot.edge.Color = edge
-		end
+		if slot.on ~= on then
+			slot.on = on
 
-		if slot.edge.Transparency ~= alpha then
-			slot.edge.Transparency = alpha
-		end
+			anim(slot.frame, soft, { BackgroundColor3 = on and th.line or th.head })
+			anim(slot.edge, soft, { Transparency = on and 0.1 or 0.6 })
+			anim(slot.tag, soft, { TextColor3 = on and th.text or th.dim })
 
-		if slot.tick.Visible ~= on then
-			slot.tick.Visible = on
+			slot.edge.Color = on and th.text or th.line
 		end
 	end
 
@@ -7502,7 +7640,7 @@ function ui.gallery(win, lane, cfg)
 		round(blank, 8)
 
 		new("UIGradient", {
-			Color = ColorSequence.new(th.accent, th.panel),
+			Color = ColorSequence.new(th.glow, th.panel),
 			Rotation = 135,
 			Transparency = NumberSequence.new({
 				NumberSequenceKeypoint.new(0, 0.45),
@@ -7545,29 +7683,13 @@ function ui.gallery(win, lane, cfg)
 			BackgroundTransparency = 1,
 			Font = Enum.Font.GothamMedium,
 			Text = "",
-			TextColor3 = th.text,
+			TextColor3 = th.dim,
 			TextSize = 10,
 			TextTruncate = Enum.TextTruncate.AtEnd,
 			ZIndex = 3,
 		}, box)
 
-		local tick = new("ImageLabel", {
-			Name = rnd(),
-			AnchorPoint = Vector2.new(1, 0),
-			Position = UDim2.new(1, -4, 0, 4),
-			Size = UDim2.fromOffset(14, 14),
-			BackgroundColor3 = th.accent,
-			BorderSizePixel = 0,
-			Image = icon("check"),
-			ImageColor3 = th.bg,
-			ScaleType = Enum.ScaleType.Fit,
-			Visible = false,
-			ZIndex = 4,
-		}, box)
-
-		new("UICorner", { CornerRadius = UDim.new(1, 0) }, tick)
-
-		local slot = { frame = box, art = art, blank = blank, glyph = glyph, initials = initials, tag = tag, tick = tick, edge = edge }
+		local slot = { frame = box, art = art, blank = blank, glyph = glyph, initials = initials, tag = tag, edge = edge }
 
 		local hit = ui.hitbox(box, { ZIndex = 5 })
 
@@ -7630,21 +7752,25 @@ function ui.gallery(win, lane, cfg)
 	-- ------------------------------------------------------ virtual rows ----
 	local cols, rows = 1, 0
 	local pass = 0
-	local last = { cols = -1, rows = -1, need = -1, first = -1, pass = -1 }
+	local last = { cols = -1, rows = -1, need = -1, first = -1, pass = -1, margin = -1 }
 
 	local function reflow()
 		local width = asz(list).X
 		local tall = asz(list).Y
 		local pitch = span + 16 + gap
 
-		cols = math.max(math.floor((width + gap) / (span + gap)), 1)
+		cols = math.max(math.floor((width - 6 + gap) / (span + gap)), 1)
 		rows = math.ceil(#view / cols)
+
+		-- centred, never closer than 3 to the edge: a stroke is drawn outside
+		-- its frame and the list clips at its own bounds
+		local margin = math.max(math.floor((width - (cols * span + (cols - 1) * gap)) / 2), 3)
 
 		-- Shrinking the canvas has to happen before the first row is read:
 		-- the engine clamps CanvasPosition while the canvas shrinks, and a
 		-- search from the bottom would otherwise keep the old scroll.
 		if rows ~= last.rows then
-			list.CanvasSize = UDim2.fromOffset(0, rows * pitch)
+			list.CanvasSize = UDim2.fromOffset(0, rows * pitch + 6)
 		end
 
 		local need = cols * (math.ceil(tall / pitch) + 2)
@@ -7654,11 +7780,11 @@ function ui.gallery(win, lane, cfg)
 		-- Scrolling inside one row moves the canvas, not the pool. Bail out
 		-- before touching a single cell unless the row or the data changed.
 		if cols == last.cols and rows == last.rows and need == last.need
-			and first == last.first and pass == last.pass then
+			and first == last.first and pass == last.pass and margin == last.margin then
 			return
 		end
 
-		last.cols, last.rows, last.need, last.first, last.pass = cols, rows, need, first, pass
+		last.cols, last.rows, last.need, last.first, last.pass, last.margin = cols, rows, need, first, pass, margin
 
 		while #pool < need do
 			pool[#pool + 1] = makecell()
@@ -7677,7 +7803,7 @@ function ui.gallery(win, lane, cfg)
 			if e then
 				local r = math.floor((index - 1) / cols)
 				local col = (index - 1) % cols
-				local pos = UDim2.fromOffset(col * (span + gap), r * pitch)
+				local pos = UDim2.fromOffset(margin + col * (span + gap), 3 + r * pitch)
 
 				if slot.frame.Position ~= pos then
 					slot.frame.Position = pos
@@ -7862,15 +7988,8 @@ function ui.gallery(win, lane, cfg)
 	-- the tool row: select all, clear, reload, plus whatever the caller adds
 	local extra = (type(cfg.buttons) == "table") and cfg.buttons or {}
 
-	if cfg.tools or cfg.multi or #extra > 0 then
+	if cfg.tools or #extra > 0 then
 		local slots = {}
-
-		if cfg.multi then
-			slots[#slots + 1] = { icon = "check", callback = function() item:all() end }
-			slots[#slots + 1] = { icon = "x", callback = function() item:clear() end }
-		elseif cfg.tools then
-			slots[#slots + 1] = { icon = "x", callback = function() item:clear() end }
-		end
 
 		if cfg.tools then
 			slots[#slots + 1] = { icon = "refresh-cw", callback = function() sieve() end }
