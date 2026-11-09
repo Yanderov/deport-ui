@@ -3051,229 +3051,242 @@ nest.GroupTransparency = 1
 
 shrink(nest)
 
-local function pod(order, pad, gap)
-	local card = new("Frame", {
+-- The watermark: one card rather than two pills. Who you are and whose
+-- script this is on the top line, the numbers that keep changing on the one
+-- below, split by hairlines that fade out at both ends.
+local sign = new("Frame", {
+	Name = rnd(),
+	Active = true,
+	Size = UDim2.fromOffset(0, 0),
+	AutomaticSize = Enum.AutomaticSize.XY,
+	BackgroundColor3 = th.panel,
+	BackgroundTransparency = 0.14,
+	BorderSizePixel = 0,
+	LayoutOrder = 1,
+	ZIndex = 2,
+}, nest)
+
+round(sign, 13)
+
+new("UIStroke", {
+	Color = th.line,
+	Thickness = 1,
+	Transparency = 0.4,
+	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+	LineJoinMode = Enum.LineJoinMode.Round,
+}, sign)
+
+if deep then
+	new("UIShadow", {
+		Color = th.bg,
+		BlurRadius = UDim.new(0, 16),
+		Offset = UDim2.fromOffset(0, 3),
+		Spread = UDim2.fromOffset(-3, -3),
+		Transparency = 0.5,
+		ZIndex = -1,
+	}, sign)
+end
+
+-- the wash and the rim light, the same material as every other surface
+local wash = new("Frame", {
+	Name = rnd(),
+	Size = UDim2.fromScale(1, 1),
+	BackgroundColor3 = th.glow,
+	BackgroundTransparency = 0.88,
+	BorderSizePixel = 0,
+	ZIndex = 2,
+}, sign)
+
+round(wash, 13)
+
+fade(wash, 90, {
+	NumberSequenceKeypoint.new(0, 0.34),
+	NumberSequenceKeypoint.new(0.55, 0.82),
+	NumberSequenceKeypoint.new(1, 0.95),
+})
+
+local rim = new("Frame", {
+	Name = rnd(),
+	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.new(0.5, 0, 0, 1),
+	Size = UDim2.new(1, -26, 0, 1),
+	BackgroundColor3 = th.glow,
+	BackgroundTransparency = 0.52,
+	BorderSizePixel = 0,
+	ZIndex = 3,
+}, sign)
+
+fade(rim, 0, {
+	NumberSequenceKeypoint.new(0, 1),
+	NumberSequenceKeypoint.new(0.5, 0.05),
+	NumberSequenceKeypoint.new(1, 1),
+})
+
+new("UIPadding", {
+	PaddingTop = UDim.new(0, 9),
+	PaddingBottom = UDim.new(0, 9),
+	PaddingLeft = UDim.new(0, 12),
+	PaddingRight = UDim.new(0, 12),
+}, sign)
+
+new("UIListLayout", {
+	FillDirection = Enum.FillDirection.Vertical,
+	HorizontalAlignment = Enum.HorizontalAlignment.Left,
+	SortOrder = Enum.SortOrder.LayoutOrder,
+	Padding = UDim.new(0, 7),
+}, sign)
+
+local function strip(order, height, gap)
+	local row = new("Frame", {
 		Name = rnd(),
-		Active = true,
-		Size = UDim2.fromOffset(0, 30),
-		AutomaticSize = Enum.AutomaticSize.X,
-		BackgroundColor3 = th.panel,
-		BackgroundTransparency = 0.16,
-		BorderSizePixel = 0,
-		LayoutOrder = order,
-		ZIndex = 2,
-	}, nest)
-
-	round(card, 8)
-
-	new("UIStroke", {
-		Color = th.line,
-		Thickness = 1,
-		Transparency = 0.45,
-		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-		LineJoinMode = Enum.LineJoinMode.Round,
-	}, card)
-
-	if deep then
-		new("UIShadow", {
-			Color = th.bg,
-			BlurRadius = UDim.new(0, 10),
-			Offset = UDim2.fromOffset(0, 2),
-			Spread = UDim2.fromOffset(-2, -2),
-			Transparency = 0.6,
-			ZIndex = -1,
-		}, card)
-	end
-
-	local skin = new("Frame", {
-		Name = rnd(),
-		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = th.glow,
-		BackgroundTransparency = 0.82,
-		BorderSizePixel = 0,
-		ZIndex = 2,
-	}, card)
-
-	round(skin, 8)
-
-	fade(skin, 90, {
-		NumberSequenceKeypoint.new(0, 0.5),
-		NumberSequenceKeypoint.new(0.6, 0.82),
-		NumberSequenceKeypoint.new(1, 0.9),
-	})
-
-	local gloss = new("Frame", {
-		Name = rnd(),
-		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, 1),
-		Size = UDim2.new(1, -14, 0, 1),
-		BackgroundColor3 = th.glow,
-		BackgroundTransparency = 0.7,
-		BorderSizePixel = 0,
-		ZIndex = 3,
-	}, card)
-
-	fade(gloss, 0, {
-		NumberSequenceKeypoint.new(0, 1),
-		NumberSequenceKeypoint.new(0.5, 0.1),
-		NumberSequenceKeypoint.new(1, 1),
-	})
-
-	local hold = new("Frame", {
-		Name = rnd(),
-		Size = UDim2.fromOffset(0, 30),
+		Size = UDim2.fromOffset(0, height),
 		AutomaticSize = Enum.AutomaticSize.X,
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		ZIndex = 3,
-	}, card)
-
-	new("UIPadding", {
-		PaddingLeft = UDim.new(0, pad),
-		PaddingRight = UDim.new(0, pad),
-	}, hold)
+		LayoutOrder = order,
+		ZIndex = 4,
+	}, sign)
 
 	new("UIListLayout", {
 		FillDirection = Enum.FillDirection.Horizontal,
 		VerticalAlignment = Enum.VerticalAlignment.Center,
 		SortOrder = Enum.SortOrder.LayoutOrder,
 		Padding = UDim.new(0, gap),
-	}, hold)
+	}, row)
 
-	drag(card, nest, 0.12)
-
-	return card, hold
+	return row
 end
 
-local _, badgehold = pod(1, 13, 8)
+local function hairline(parent, order, height)
+	local rail = new("Frame", {
+		Name = rnd(),
+		Size = UDim2.fromOffset(1, height),
+		BackgroundColor3 = th.glow,
+		BackgroundTransparency = 0.6,
+		BorderSizePixel = 0,
+		LayoutOrder = order,
+		ZIndex = 4,
+	}, parent)
 
-new("ImageLabel", {
-	Name = rnd(),
-	Size = UDim2.fromOffset(16, 16),
-	BackgroundTransparency = 1,
-	Image = icon("code"),
-	ImageColor3 = th.dim,
-	ImageTransparency = 0,
-	LayoutOrder = 1,
-	ScaleType = Enum.ScaleType.Fit,
-	ZIndex = 4,
-}, badgehold)
+	fade(rail, 90, {
+		NumberSequenceKeypoint.new(0, 0.95),
+		NumberSequenceKeypoint.new(0.5, 0),
+		NumberSequenceKeypoint.new(1, 0.95),
+	})
 
-local brandtag = new("TextLabel", {
-	Name = rnd(),
-	AutomaticSize = Enum.AutomaticSize.X,
-	Size = UDim2.fromOffset(0, 20),
-	BackgroundTransparency = 1,
-	Font = Enum.Font.GothamMedium,
-	Text = "inertiahub.xyz",
-	TextColor3 = th.text,
-	TextSize = 14,
-	TextTransparency = 0.05,
-	LayoutOrder = 2,
-	ZIndex = 4,
-}, badgehold)
-
-function visualsui:setwatermarktext(text)
-	brandtag.Text = tostring(text or "")
+	return rail
 end
 
-local _, stathold = pod(2, 13, 8)
+-- ------------------------------------------------------------- who you are
+local top = strip(1, 24, 9)
 
 local face = new("ImageLabel", {
 	Name = rnd(),
-	Size = UDim2.fromOffset(22, 22),
+	Size = UDim2.fromOffset(24, 24),
 	BackgroundColor3 = th.bg,
-	BackgroundTransparency = 0.3,
+	BackgroundTransparency = 0.25,
 	BorderSizePixel = 0,
 	Image = visualsui.logo ~= "" and visualsui.logo
 		or string.format("rbxthumb://type=AvatarHeadShot&id=%d&w=150&h=150", lp.UserId),
 	ImageTransparency = 0.02,
-	LayoutOrder = 10,
+	LayoutOrder = 1,
 	ScaleType = Enum.ScaleType.Crop,
-	ZIndex = 4,
-}, stathold)
+	ZIndex = 5,
+}, top)
 
 new("UICorner", { CornerRadius = UDim.new(1, 0) }, face)
 
 new("UIStroke", {
 	Color = th.line,
 	Thickness = 1,
-	Transparency = 0.35,
+	Transparency = 0.3,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 }, face)
 
-local function chip(order, art, txt, lead)
-	if not lead then
-		local rail = new("Frame", {
-			Name = rnd(),
-			Size = UDim2.fromOffset(14, 16),
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-			LayoutOrder = order,
-			ZIndex = 4,
-		}, stathold)
+local whotag = new("TextLabel", {
+	Name = rnd(),
+	AutomaticSize = Enum.AutomaticSize.X,
+	Size = UDim2.fromOffset(0, 20),
+	BackgroundTransparency = 1,
+	Font = Enum.Font.GothamBold,
+	Text = lp.Name,
+	TextColor3 = th.text,
+	TextSize = 14,
+	LayoutOrder = 2,
+	ZIndex = 5,
+}, top)
 
-		local line = new("Frame", {
-			Name = rnd(),
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.fromOffset(1, 16),
-			BackgroundColor3 = th.glow,
-			BackgroundTransparency = 0.62,
-			BorderSizePixel = 0,
-			ZIndex = 4,
-		}, rail)
+hairline(top, 3, 16)
 
-		fade(line, 90, {
-			NumberSequenceKeypoint.new(0, 0.85),
-			NumberSequenceKeypoint.new(0.5, 0),
-			NumberSequenceKeypoint.new(1, 0.85),
-		})
-	end
+new("ImageLabel", {
+	Name = rnd(),
+	Size = UDim2.fromOffset(14, 14),
+	BackgroundTransparency = 1,
+	Image = icon("code"),
+	ImageColor3 = th.dim,
+	LayoutOrder = 4,
+	ScaleType = Enum.ScaleType.Fit,
+	ZIndex = 5,
+}, top)
 
-	if art then
-		new("ImageLabel", {
-			Name = rnd(),
-			Size = UDim2.fromOffset(15, 15),
-			BackgroundTransparency = 1,
-			Image = icon(art),
-			ImageColor3 = th.text,
-			ImageTransparency = 0.25,
-			LayoutOrder = order + 1,
-			ScaleType = Enum.ScaleType.Fit,
-			ZIndex = 4,
-		}, stathold)
-	end
+local brandtag = new("TextLabel", {
+	Name = rnd(),
+	AutomaticSize = Enum.AutomaticSize.X,
+	Size = UDim2.fromOffset(0, 18),
+	BackgroundTransparency = 1,
+	Font = Enum.Font.GothamMedium,
+	Text = "inertiahub.xyz",
+	TextColor3 = th.dim,
+	TextSize = 12,
+	LayoutOrder = 5,
+	ZIndex = 5,
+}, top)
+
+function visualsui:setwatermarktext(text)
+	brandtag.Text = tostring(text or "")
+end
+
+-- ------------------------------------------------------- what keeps moving
+local bottom = strip(2, 18, 8)
+
+local function readout(order, art, txt, room)
+	new("ImageLabel", {
+		Name = rnd(),
+		Size = UDim2.fromOffset(13, 13),
+		BackgroundTransparency = 1,
+		Image = icon(art),
+		ImageColor3 = th.dim,
+		LayoutOrder = order,
+		ScaleType = Enum.ScaleType.Fit,
+		ZIndex = 5,
+	}, bottom)
 
 	return new("TextLabel", {
 		Name = rnd(),
-		AutomaticSize = Enum.AutomaticSize.X,
-		Size = UDim2.fromOffset(0, 20),
+		Size = UDim2.fromOffset(room, 18),
 		BackgroundTransparency = 1,
 		Font = Enum.Font.GothamMedium,
 		Text = txt,
 		TextColor3 = th.text,
-		TextSize = 14,
-		TextTransparency = 0.05,
-		LayoutOrder = order + 2,
-		ZIndex = 4,
-	}, stathold)
+		TextSize = 13,
+		TextTransparency = 0.1,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		LayoutOrder = order + 1,
+		ZIndex = 5,
+	}, bottom)
 end
 
-local whotag = chip(20, nil, lp.Name, true)
-local ratetag = chip(30, "layers", "0")
-local lagtag = chip(40, "wifi", "0ms")
-local timetag = chip(50, "clock", "00:00")
+local ratetag = readout(1, "layers", "0", gauge("999", 13))
 
-for tag, wide in next, {
-	[ratetag] = gauge("999", 14),
-	[lagtag] = gauge("999ms", 14),
-	[timetag] = gauge("00:00", 14),
-} do
-	tag.AutomaticSize = Enum.AutomaticSize.None
-	tag.Size = UDim2.fromOffset(wide, 20)
-	tag.TextXAlignment = Enum.TextXAlignment.Left
-end
+hairline(bottom, 3, 12)
+
+local lagtag = readout(4, "wifi", "0ms", gauge("999ms", 13))
+
+hairline(bottom, 6, 12)
+
+local timetag = readout(7, "clock", "00:00", gauge("00:00", 13))
+
+drag(sign, nest, 0.12)
 
 local keyszone = overkeys
 
@@ -3874,7 +3887,7 @@ function ui.caption(row, text, width)
 		BackgroundTransparency = 1,
 		Font = Enum.Font.GothamMedium,
 		Text = tostring(text or ""),
-		TextColor3 = th.dim,
+		TextColor3 = th.text,
 		TextSize = 12,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 		TextXAlignment = Enum.TextXAlignment.Left,
@@ -5340,6 +5353,36 @@ function ui.attach(win, host)
 	local api = {}
 	local seq = 0
 
+	-- Every caption made here, so a toggle can dim its own settings while the
+	-- feature is off and bring them back up when it is on.
+	local captions = {}
+
+	local function caption(row, text, width)
+		local label = ui.caption(row, text, width)
+
+		captions[#captions + 1] = label
+
+		return label
+	end
+
+	api.lit = true
+
+	function api.setlit(on)
+		on = on and true or false
+
+		if on == api.lit then
+			return
+		end
+
+		api.lit = on
+
+		for _, label in next, captions do
+			if label.Parent then
+				anim(label, glide, { TextColor3 = on and th.text or th.dim })
+			end
+		end
+	end
+
 	local function order()
 		seq += 1
 
@@ -5455,8 +5498,10 @@ function ui.attach(win, host)
 		c = params(c, { name = "Toggle", default = false, options = false, flag = nil, callback = nil })
 
 		local row = ui.rowframe(host, 26, order())
-		local cap = ui.caption(row, c.name, UDim2.new(1, c.options and -82 or -56, 0, 16))
+		local cap = caption(row, c.name, UDim2.new(1, c.options and -82 or -56, 0, 16))
 		local on = c.default and true or false
+
+		cap.TextColor3 = on and th.text or th.dim
 
 		local track = new("Frame", {
 			Name = rnd(),
@@ -5497,6 +5542,14 @@ function ui.attach(win, host)
 				BackgroundColor3 = on and th.bg or th.text,
 			})
 			anim(cap, glide, { TextColor3 = on and th.text or th.dim })
+
+			-- rawget: reading el.options would build the panel, and most
+			-- toggles never have one
+			local panel = rawget(el, "options")
+
+			if panel and panel.setlit then
+				panel.setlit(on)
+			end
 		end
 
 		function el:get()
@@ -5621,6 +5674,8 @@ function ui.attach(win, host)
 
 				local panel = ui.attach(win, inner)
 
+				panel.setlit(on)
+
 				panel.reveal = function()
 					dots.Visible = true
 				end
@@ -5694,7 +5749,7 @@ function ui.attach(win, host)
 		local value = math.clamp(tonumber(c.default) or lo, lo, hi)
 
 		local row = ui.rowframe(host, 40, order())
-		local cap = ui.caption(row, c.name, UDim2.new(1, -74, 0, 14))
+		local cap = caption(row, c.name, UDim2.new(1, -74, 0, 14))
 
 		cap.AnchorPoint = Vector2.new()
 		cap.Position = UDim2.fromOffset(0, 2)
@@ -5891,7 +5946,7 @@ function ui.attach(win, host)
 
 		local row = ui.rowframe(host, 26, order())
 		local wide = tostring(c.name or "") == ""
-		local cap = ui.caption(row, c.name, UDim2.new(0.44, -6, 0, 16))
+		local cap = caption(row, c.name, UDim2.new(0.44, -6, 0, 16))
 
 		cap.Visible = not wide
 
@@ -6238,7 +6293,7 @@ function ui.attach(win, host)
 			or Color3.new(1, 1, 1)
 
 		local row = ui.rowframe(host, 26, order())
-		local cap = ui.caption(row, c.name, UDim2.new(1, -52, 0, 16))
+		local cap = caption(row, c.name, UDim2.new(1, -52, 0, 16))
 
 		local chip = ui.pill(row, { Size = UDim2.fromOffset(40, 20), BackgroundColor3 = value })
 
@@ -6547,7 +6602,7 @@ function ui.attach(win, host)
 			or nil
 
 		local row = ui.rowframe(host, 26, order())
-		local cap = ui.caption(row, c.name, UDim2.new(1, -78, 0, 16))
+		local cap = caption(row, c.name, UDim2.new(1, -78, 0, 16))
 
 		local field = ui.pill(row, { Size = UDim2.fromOffset(70, 22) })
 
