@@ -96,23 +96,23 @@ local sc = visualsui.scale
 -- Neutral, not tinted. The menu sits on near-black grays so the white accent
 -- reads as light on the surface rather than a sticker on top of it.
 visualsui.theme = {
-	bg = Color3.fromRGB(8, 8, 9),
-	side = Color3.fromRGB(13, 13, 14),
-	panel = Color3.fromRGB(18, 18, 19),
-	head = Color3.fromRGB(38, 38, 41),
-	line = Color3.fromRGB(66, 66, 70),
-	glow = Color3.fromRGB(132, 132, 136),
-	text = Color3.fromRGB(244, 244, 246),
-	dim = Color3.fromRGB(160, 160, 165),
+	bg = Color3.fromRGB(14, 14, 16),
+	side = Color3.fromRGB(18, 18, 20),
+	panel = Color3.fromRGB(21, 21, 24),
+	head = Color3.fromRGB(30, 30, 34),
+	line = Color3.fromRGB(46, 46, 52),
+	glow = Color3.fromRGB(122, 122, 128),
+	text = Color3.fromRGB(235, 235, 238),
+	dim = Color3.fromRGB(150, 150, 158),
 	accent = Color3.fromRGB(255, 255, 255),
 }
 
 visualsui.sheet = {
-	bg = Color3.fromRGB(22, 22, 23),
-	row = Color3.fromRGB(38, 38, 40),
-	press = Color3.fromRGB(54, 54, 56),
-	sep = Color3.fromRGB(66, 66, 69),
-	grab = Color3.fromRGB(104, 104, 108),
+	bg = Color3.fromRGB(24, 24, 27),
+	row = Color3.fromRGB(36, 36, 40),
+	press = Color3.fromRGB(50, 50, 55),
+	sep = Color3.fromRGB(62, 62, 68),
+	grab = Color3.fromRGB(99, 99, 104),
 	blue = Color3.fromRGB(255, 255, 255),
 }
 
@@ -4188,13 +4188,26 @@ function ui.floater(width, height)
 
 	round(hull, 12)
 
+	-- The gradient lives on a backdrop frame inside, never on the group: a
+	-- UIGradient on a CanvasGroup multiplies the whole rendered surface, text
+	-- included, and turned every row in the list near-black.
+	local backdrop = new("Frame", {
+		Name = rnd(),
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		BorderSizePixel = 0,
+		ZIndex = 0,
+	}, hull)
+
+	round(backdrop, 12)
+
 	new("UIGradient", {
 		Rotation = 90,
 		Color = ColorSequence.new({
 			ColorSequenceKeypoint.new(0, th.panel),
 			ColorSequenceKeypoint.new(1, th.bg),
 		}),
-	}, hull)
+	}, backdrop)
 
 	new("UIStroke", {
 		Color = th.line,
@@ -4581,20 +4594,9 @@ function visualsui:window(cfg)
 		ZIndex = 5,
 	}, header)
 
-	new("ImageLabel", {
-		Name = rnd(),
-		Position = UDim2.fromOffset(16, 30),
-		Size = UDim2.fromOffset(12, 12),
-		BackgroundTransparency = 1,
-		Image = icon("box"),
-		ImageColor3 = th.dim,
-		ScaleType = Enum.ScaleType.Fit,
-		ZIndex = 5,
-	}, header)
-
 	local buildtag = new("TextLabel", {
 		Name = rnd(),
-		Position = UDim2.fromOffset(32, 28),
+		Position = UDim2.fromOffset(16, 28),
 		Size = UDim2.fromOffset(220, 16),
 		BackgroundTransparency = 1,
 		Font = Enum.Font.GothamMedium,
@@ -5322,6 +5324,31 @@ function visualsui:window(cfg)
 	end
 
 	-- ---------------------------------------------------- open and close ----
+	-- A game that locks the mouse to the screen centre (shift lock, first
+	-- person) pins the pointer there, so nothing in the menu can be clicked:
+	-- every click lands in the middle of the screen. While the menu is open the
+	-- pointer is freed, on the last render step so it runs after the game's own
+	-- camera script has set the lock for that frame.
+	local FREE_STEP = "deport_free_" .. rnd()
+
+	local function freepointer(on)
+		pcall(function()
+			rs:UnbindFromRenderStep(FREE_STEP)
+		end)
+
+		if not on then
+			return
+		end
+
+		rs:BindToRenderStep(FREE_STEP, Enum.RenderPriority.Last.Value, function()
+			if uis.MouseBehavior ~= Enum.MouseBehavior.Default then
+				uis.MouseBehavior = Enum.MouseBehavior.Default
+			end
+		end)
+	end
+
+	win.freepointer = freepointer
+
 	local renders = 0
 
 	-- Fade and a short slide. Not a scale: a UIScale on the shell makes the
@@ -5341,6 +5368,8 @@ function visualsui:window(cfg)
 
 		-- an open drop-down belongs to the page it was opened on
 		ui.closeall()
+
+		freepointer(want)
 
 		renders += 1
 
@@ -8931,6 +8960,12 @@ end
 
 -- =============================================================== unload ====
 function visualsui:unload()
+	for _, w in next, visualsui.wins do
+		if w.freepointer then
+			pcall(w.freepointer, false)
+		end
+	end
+
 	if scr then
 		pcall(function()
 			scr.Enabled = false
