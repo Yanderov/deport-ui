@@ -3775,7 +3775,7 @@ function visualsui.linkhead(head)
 		-- every glyph takes the same box and none needs an offset
 		local b, art = head.button(head.quest, 28, l.image or "", 17)
 
-		b.Position = UDim2.new(1, -(n * 32), 0, 14)
+		b.Position = UDim2.new(1, -((n - 1) * 32), 0, 14)
 		art.ImageColor3 = visualsui.theme.text
 		art.ImageTransparency = 0.18
 
@@ -3829,8 +3829,7 @@ end
 -- control itself hugging the right edge. Height is the only thing that
 -- varies, so it is the only thing a caller passes.
 -- Every row keeps the same inset, so captions and controls share one left and
--- one right edge down a card. A toggle opts out: its lit plate runs the whole
--- width and it sets the same inset by hand inside it.
+-- one right edge down a card.
 ui.INSET = 10
 
 function ui.rowframe(parent, height, order, flush)
@@ -4098,6 +4097,12 @@ function ui.glider(parent, radius, z)
 	return api
 end
 
+-- Put every open picker away: drop-downs, colour panels, key panels, menus.
+function ui.closeall()
+	hush()
+	sink()
+end
+
 function ui.floater(width, height)
 	local th = ui.palette()
 
@@ -4105,7 +4110,7 @@ function ui.floater(width, height)
 		Name = rnd(),
 		Size = UDim2.fromOffset(width, height),
 		BackgroundColor3 = ui.sheet.bg,
-		BackgroundTransparency = 0.08,
+		BackgroundTransparency = 0,
 		BorderSizePixel = 0,
 		ClipsDescendants = true,
 		Visible = false,
@@ -4200,13 +4205,9 @@ function ui.reveal(hull, tall)
 
 	-- the same entrance as the window: a little under full size, fading in
 	scale.Scale = 0.97
-	hull.BackgroundTransparency = 0.7
 
 	anim(scale, arrive, { Scale = 1 })
-	anim(hull, arrive, {
-		Size = UDim2.new(hull.Size.X.Scale, hull.Size.X.Offset, 0, tall),
-		BackgroundTransparency = 0.08,
-	})
+	anim(hull, arrive, { Size = UDim2.new(hull.Size.X.Scale, hull.Size.X.Offset, 0, tall) })
 end
 
 function ui.conceal(hull, done)
@@ -4216,10 +4217,7 @@ function ui.conceal(hull, done)
 		anim(scale, depart, { Scale = 0.98 })
 	end
 
-	anim(hull, depart, {
-		Size = UDim2.new(hull.Size.X.Scale, hull.Size.X.Offset, 0, 0),
-		BackgroundTransparency = 1,
-	})
+	anim(hull, depart, { Size = UDim2.new(hull.Size.X.Scale, hull.Size.X.Offset, 0, 0) })
 
 	task.delay(0.17, function()
 		if hull.Parent then
@@ -4306,7 +4304,7 @@ function visualsui:window(cfg)
 		Position = UDim2.fromScale(0.5, 0.5),
 		Size = win.size,
 		BackgroundColor3 = th.bg,
-		BackgroundTransparency = 0.2,
+		BackgroundTransparency = 0,
 		BorderSizePixel = 0,
 		ClipsDescendants = true,
 		GroupTransparency = 1,
@@ -4329,14 +4327,21 @@ function visualsui:window(cfg)
 
 	shrink(shell)
 
-	local twin = crisp(shell)
+	-- On a phone the shell is drawn through a UIScale below one, and a canvas
+	-- texture softens text there; the plain twin keeps it sharp. On a desktop
+	-- the scale is one, nothing is soft, and shuffling the window's children
+	-- between two parents on every open and close is what made it stutter.
+	local twin = (sc ~= 1) and crisp(shell) or nil
 
 	win.shell = shell
 	win.root = shell
 	visualsui.themeroots[shell] = true
-	visualsui.themeroots[twin] = true
 	maskadd(shell)
-	maskadd(twin)
+
+	if twin then
+		visualsui.themeroots[twin] = true
+		maskadd(twin)
+	end
 
 	-- --------------------------------------------------------- header ----
 	local header = new("Frame", {
@@ -4517,13 +4522,6 @@ function visualsui:window(cfg)
 
 		return b, art
 	end
-
-	local close = headbutton(quest, 28, icon("x"), 13)
-
-	conn(close.MouseButton1Click, function()
-		visualsui:chime("close")
-		win:render(false)
-	end)
 
 	local head = { quest = quest, links = {}, button = headbutton }
 
@@ -4821,6 +4819,7 @@ function visualsui:window(cfg)
 			node.owner.last = node
 		end
 
+		ui.closeall()
 		show(win.active)
 		paintbar()
 		paintcapsule()
@@ -5042,8 +5041,11 @@ function visualsui:window(cfg)
 	end
 
 	-- ---------------------------------------------------- open and close ----
-	local pop = new("UIScale", { Scale = 1 }, shell)
+	local renders = 0
 
+	-- Fade and a short slide. Not a scale: a UIScale on the shell makes the
+	-- engine re-lay out every descendant on every frame of the tween, which
+	-- measured at a 39 ms frame; a fade costs 7 ms and a slide 10.
 	function win:render(value)
 		local want = value and true or false
 
@@ -5051,32 +5053,53 @@ function visualsui:window(cfg)
 			return
 		end
 
+		local was = win.open
+
 		win.open = want
 		visualsui.shown = want
 
-		if want then
-			shell.Visible = true
-			hush()
-			sink()
-			ui.sheen(shellglass, 0.8)
+		-- an open drop-down belongs to the page it was opened on
+		ui.closeall()
+
+		renders += 1
+
+		local mine = renders
+
+		-- Where the window rests is wherever it was last left, since it can be
+		-- dragged. Closing in the middle of the opening slide would read a
+		-- position 10 px off, so only a window that has settled is believed.
+		if was and os.clock() - (win.openedAt or 0) > 0.4 then
+			win.home = shell.Position
 		end
 
-		local from = shell.GroupTransparency
-		local to = want and 0 or 1
-		-- Opacity and scale ride one curve: in on a long ease-out, out on a
-		-- short ease-in, so opening and closing read as the same gesture.
-		local sfrom = want and 0.965 or pop.Scale
-		local sto = want and 1 or 0.975
+		local base = win.home or shell.Position
 
-		flow(shell, want and 0.30 or 0.16, function(t) return t end, function(t)
-			local a = want and outq(t) or inq(t)
+		win.home = base
 
-			shell.GroupTransparency = from + (to - from) * a
-			pop.Scale = sfrom + (sto - sfrom) * a
+		if want then
+			win.openedAt = os.clock()
+		end
 
-			if t >= 1 and not win.open then
+		if want then
+			shell.Position = UDim2.new(base.X.Scale, base.X.Offset, base.Y.Scale, base.Y.Offset + 10)
+			shell.Visible = true
+
+			anim(shell, TweenInfo.new(0.24, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { GroupTransparency = 0 })
+			anim(shell, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Position = base })
+
+			return
+		end
+
+		anim(shell, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { GroupTransparency = 1 })
+		anim(shell, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+			Position = UDim2.new(base.X.Scale, base.X.Offset, base.Y.Scale, base.Y.Offset + 6),
+		})
+
+		task.delay(0.17, function()
+			-- opened again before the fade finished: leave it be
+			if mine == renders and not win.open and shell.Parent then
 				shell.Visible = false
-				pop.Scale = 1
+				shell.Position = base
 			end
 		end)
 	end
@@ -5596,59 +5619,17 @@ function ui.attach(win, host)
 	function api:toggle(c)
 		c = params(c, { name = "Toggle", default = false, options = false, flag = nil, callback = nil })
 
-		local row = ui.rowframe(host, 30, order(), true)
+		local row = ui.rowframe(host, 28, order())
 		local on = c.default and true or false
 
-		-- A lit function wears a plate of its own: a little lighter, a firmer
-		-- edge and a rim of light along the top. Off, the plate is not there at
-		-- all, so the difference reads at a glance and never shouts.
-		local plate = new("Frame", {
-			Name = rnd(),
-			Size = UDim2.fromScale(1, 1),
-			BackgroundColor3 = th.glow,
-			BackgroundTransparency = on and 0.9 or 1,
-			BorderSizePixel = 0,
-		}, row)
+		local cap = caption(row, c.name, UDim2.new(1, c.options and -82 or -56, 0, 16))
 
-		round(plate, 9)
-
-		local plateEdge = new("UIStroke", {
-			Color = th.glow,
-			Thickness = 1,
-			Transparency = on and 0.62 or 1,
-			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-		}, plate)
-
-		fade(plate, 90, {
-			NumberSequenceKeypoint.new(0, 0.1),
-			NumberSequenceKeypoint.new(1, 0.6),
-		})
-
-		local plateRim = new("Frame", {
-			Name = rnd(),
-			AnchorPoint = Vector2.new(0.5, 0),
-			Position = UDim2.new(0.5, 0, 0, 1),
-			Size = UDim2.new(1, -18, 0, 1),
-			BackgroundColor3 = th.text,
-			BackgroundTransparency = on and 0.55 or 1,
-			BorderSizePixel = 0,
-		}, plate)
-
-		fade(plateRim, 0, {
-			NumberSequenceKeypoint.new(0, 1),
-			NumberSequenceKeypoint.new(0.5, 0),
-			NumberSequenceKeypoint.new(1, 1),
-		})
-
-		local cap = caption(row, c.name, UDim2.new(1, c.options and -96 or -72, 0, 16))
-
-		cap.Position = UDim2.new(0, ui.INSET, 0.5, 0)
-		cap.TextColor3 = on and th.text or th.dim
+				cap.TextColor3 = on and th.text or th.dim
 
 		local track = new("Frame", {
 			Name = rnd(),
 			AnchorPoint = Vector2.new(1, 0.5),
-			Position = UDim2.new(1, -ui.INSET, 0.5, 0),
+			Position = UDim2.new(1, 0, 0.5, 0),
 			Size = UDim2.fromOffset(34, 18),
 			BackgroundColor3 = on and th.accent or th.head,
 			BorderSizePixel = 0,
@@ -5684,9 +5665,6 @@ function ui.attach(win, host)
 				BackgroundColor3 = on and th.bg or th.text,
 			})
 			anim(cap, glide, { TextColor3 = on and th.text or th.dim })
-			anim(plate, soft, { BackgroundTransparency = on and 0.9 or 1 })
-			anim(plateEdge, soft, { Transparency = on and 0.62 or 1 })
-			anim(plateRim, soft, { BackgroundTransparency = on and 0.55 or 1 })
 
 			-- rawget: reading el.options would build the panel, and most
 			-- toggles never have one
@@ -5717,14 +5695,6 @@ function ui.attach(win, host)
 		end
 
 		local hit = ui.hitbox(row)
-
-		conn(hit.MouseEnter, function()
-			anim(plate, soft, { BackgroundTransparency = on and 0.85 or 0.95 })
-		end)
-
-		conn(hit.MouseLeave, function()
-			anim(plate, soft, { BackgroundTransparency = on and 0.9 or 1 })
-		end)
 
 		conn(hit.MouseButton1Click, function()
 			visualsui:chime("tap")
@@ -5778,7 +5748,7 @@ function ui.attach(win, host)
 				local dots = new("ImageButton", {
 					Name = rnd(),
 					AnchorPoint = Vector2.new(1, 0.5),
-					Position = UDim2.new(1, -52, 0.5, 0),
+					Position = UDim2.new(1, -42, 0.5, 0),
 					Size = UDim2.fromOffset(18, 18),
 					BackgroundColor3 = th.head,
 					BackgroundTransparency = 1,
@@ -5798,24 +5768,24 @@ function ui.attach(win, host)
 
 				conn(dots.MouseButton1Click, function()
 					shown = not shown
-					fold.Visible = true
 
 					visualsui:chime("tap")
 					anim(dots, glide, { ImageColor3 = shown and th.text or th.dim, Rotation = shown and 90 or 0 })
 
-					-- One tween, not a Lua callback every frame: the strip sits
-					-- inside four nested AutomaticSize frames, and re-driving
-					-- its height from Lua re-laid the whole page out each frame.
-					local to = shown and asz(inner).Y or 0
+					-- The strip sits inside five nested auto-sized frames, so every
+					-- height written to it re-lays the whole page out. Animating
+					-- the height did that once per frame, which is the stutter it
+					-- had. Now the height changes once, and the content slides in
+					-- under the clip, which costs a position write and no layout.
+					if shown then
+						fold.Size = UDim2.new(1, 0, 0, asz(inner).Y)
+						fold.Visible = true
+						inner.Position = UDim2.fromOffset(10, -12)
 
-					anim(fold, soft, { Size = UDim2.new(1, 0, 0, to) })
-
-					if not shown then
-						task.delay(0.24, function()
-							if not shown and fold.Parent then
-								fold.Visible = false
-							end
-						end)
+						anim(inner, arrive, { Position = UDim2.fromOffset(10, 0) })
+					else
+						fold.Visible = false
+						fold.Size = UDim2.new(1, 0, 0, 0)
 					end
 				end)
 
@@ -6983,8 +6953,8 @@ function ui.cardshell(win, lane, c)
 		Padding = UDim.new(0, 6),
 	}, items)
 
-	-- Folding is a height on the body: the items keep their own size, so
-	-- opening it again needs no measuring.
+	-- Folding changes the body's height once. Animating it re-laid the whole
+	-- page out every frame, so the chevron turns and the body just goes.
 	local shut = false
 
 	conn(ui.hitbox(head, { ZIndex = 4 }).MouseButton1Click, function()
@@ -6994,23 +6964,12 @@ function ui.cardshell(win, lane, c)
 		anim(fold, glide, { Rotation = shut and -90 or 0 })
 
 		if shut then
-			local from = asz(body).Y
-
 			body.AutomaticSize = Enum.AutomaticSize.None
-
-			flow(body, 0.16, inq, function(k)
-				body.Size = UDim2.new(1, 0, 0, from * (1 - k))
-			end)
+			body.Size = UDim2.new(1, 0, 0, 0)
+			items.Visible = false
 		else
-			local to = asz(items).Y
-
-			flow(body, 0.18, outq, function(k)
-				body.Size = UDim2.new(1, 0, 0, to * k)
-
-				if k >= 1 then
-					body.AutomaticSize = Enum.AutomaticSize.Y
-				end
-			end)
+			items.Visible = true
+			body.AutomaticSize = Enum.AutomaticSize.Y
 		end
 	end)
 
@@ -7569,7 +7528,7 @@ function ui.gallery(win, lane, cfg)
 			slot.on = on
 
 			anim(slot.frame, soft, { BackgroundColor3 = on and th.line or th.head })
-			anim(slot.edge, soft, { Transparency = on and 0.1 or 0.6 })
+			anim(slot.edge, soft, { Transparency = on and 0.05 or 0.55 })
 			anim(slot.tag, soft, { TextColor3 = on and th.text or th.dim })
 
 			slot.edge.Color = on and th.text or th.line
@@ -7609,35 +7568,47 @@ function ui.gallery(win, lane, cfg)
 			Visible = false,
 		}, list)
 
-		round(box, 10)
+		round(box, 12)
 
 		local edge = new("UIStroke", {
 			Color = th.line,
 			Thickness = 1,
-			Transparency = 0.6,
+			Transparency = 0.55,
 			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 			LineJoinMode = Enum.LineJoinMode.Round,
 		}, box)
 
+		-- The picture sits in a rounded well of its own, so a square image
+		-- never pokes its corners out of the cell and every cell has the same
+		-- inner shape whatever is drawn in it.
+		local well = new("Frame", {
+			Name = rnd(),
+			Position = UDim2.fromOffset(5, 5),
+			Size = UDim2.new(1, -10, 0, span - 12),
+			BackgroundColor3 = th.panel,
+			BorderSizePixel = 0,
+			ClipsDescendants = true,
+			ZIndex = 2,
+		}, box)
+
+		round(well, 8)
+
 		local art = new("ImageLabel", {
 			Name = rnd(),
-			Size = UDim2.new(1, -10, 0, span - 12),
-			Position = UDim2.fromOffset(5, 5),
+			Position = UDim2.fromOffset(3, 3),
+			Size = UDim2.new(1, -6, 1, -6),
 			BackgroundTransparency = 1,
 			ScaleType = Enum.ScaleType.Fit,
 			ZIndex = 2,
-		}, box)
+		}, well)
 
 		local blank = new("Frame", {
 			Name = rnd(),
-			Position = UDim2.fromOffset(5, 5),
-			Size = UDim2.new(1, -10, 0, span - 12),
+			Size = UDim2.fromScale(1, 1),
 			BackgroundColor3 = th.head,
 			BorderSizePixel = 0,
 			ZIndex = 2,
-		}, box)
-
-		round(blank, 8)
+		}, well)
 
 		new("UIGradient", {
 			Color = ColorSequence.new(th.glow, th.panel),
