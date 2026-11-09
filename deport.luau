@@ -99,12 +99,12 @@ local sc = visualsui.scale
 visualsui.theme = {
 	bg = Color3.fromRGB(8, 8, 9),
 	side = Color3.fromRGB(13, 13, 14),
-	panel = Color3.fromRGB(17, 17, 18),
-	head = Color3.fromRGB(28, 28, 30),
-	line = Color3.fromRGB(54, 54, 57),
-	glow = Color3.fromRGB(124, 124, 128),
-	text = Color3.fromRGB(242, 242, 244),
-	dim = Color3.fromRGB(138, 138, 142),
+	panel = Color3.fromRGB(18, 18, 19),
+	head = Color3.fromRGB(38, 38, 41),
+	line = Color3.fromRGB(66, 66, 70),
+	glow = Color3.fromRGB(132, 132, 136),
+	text = Color3.fromRGB(244, 244, 246),
+	dim = Color3.fromRGB(160, 160, 165),
 	accent = Color3.fromRGB(255, 255, 255),
 }
 
@@ -3122,19 +3122,31 @@ fade(rim, 0, {
 	NumberSequenceKeypoint.new(1, 1),
 })
 
+-- The content lives in its own frame. The wash above is sized to fill the
+-- card, and a list layout on the card itself would take it for a row, which
+-- makes an auto-sized card chase its own child until it covers the screen.
+local body = new("Frame", {
+	Name = rnd(),
+	Size = UDim2.fromOffset(0, 0),
+	AutomaticSize = Enum.AutomaticSize.XY,
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	ZIndex = 4,
+}, sign)
+
 new("UIPadding", {
 	PaddingTop = UDim.new(0, 9),
 	PaddingBottom = UDim.new(0, 9),
 	PaddingLeft = UDim.new(0, 12),
 	PaddingRight = UDim.new(0, 12),
-}, sign)
+}, body)
 
 new("UIListLayout", {
 	FillDirection = Enum.FillDirection.Vertical,
 	HorizontalAlignment = Enum.HorizontalAlignment.Left,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	Padding = UDim.new(0, 7),
-}, sign)
+}, body)
 
 local function strip(order, height, gap)
 	local row = new("Frame", {
@@ -3145,7 +3157,7 @@ local function strip(order, height, gap)
 		BorderSizePixel = 0,
 		LayoutOrder = order,
 		ZIndex = 4,
-	}, sign)
+	}, body)
 
 	new("UIListLayout", {
 		FillDirection = Enum.FillDirection.Horizontal,
@@ -4207,7 +4219,8 @@ end
 function ui.titlecase(s)
 	s = tostring(s or "")
 
-	if s ~= string.upper(s) then
+	-- short names are acronyms (ESP, FX, UI): title-casing would make "Esp"
+	if s ~= string.upper(s) or #s <= 3 then
 		return s
 	end
 

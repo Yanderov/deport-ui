@@ -1012,7 +1012,7 @@ function NeverLose:CreateWindow(cfg)
 
 				-- the grid is as tall as its column leaves it: the card adds
 				-- its header, search and padding, and the tool row
-				local chrome = 86 + ((gcfg.Tools == true or type(gcfg.Buttons) == "table") and 32 or 0)
+				local chrome = 104 + ((gcfg.Tools == true or type(gcfg.Buttons) == "table" or gcfg.Multi) and 36 or 0)
 					- (gcfg.Search == false and 32 or 0);
 				local tall = typeof(win.size) == "UDim2" and win.size.Y.Offset or 600;
 				local height = math.max(110, math.min(gcfg.Height or 260, tall - 190 - chrome));
