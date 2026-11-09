@@ -17,7 +17,7 @@ one or two columns under that.
 ```lua
 local lib = loadstring(game:HttpGet("https://raw.githubusercontent.com/Yanderov/deport-ui/main/deport.luau"))()
 
-local win = lib:window({ title = "Deport", build = "build: 1.0", size = UDim2.fromOffset(860, 600), bind = "RightShift" })
+local win = lib:window({ title = "Deport", build = "build: 1.0", size = UDim2.fromOffset(860, 600), bind = "Delete" })
 
 local tab = win:tab({ name = "Visuals", icon = "eye" })
 local page = tab:sub({ name = "ESP", icon = "user" })

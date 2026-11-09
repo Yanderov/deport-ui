@@ -50,6 +50,24 @@ function lib:retheme(map)
 	NeverLose.MainColor = self.theme.bg;
 end;
 
+-- The old default was a neutral grey palette with a white accent. A config
+-- saved under it would repaint the new black-blue menu grey on load, so a
+-- palette that still matches that signature is replaced by the new default.
+local function legacyTheme(theme)
+	local accent, bg = theme.accent, theme.bg;
+
+	if type(accent) ~= "string" or type(bg) ~= "string" then return false end;
+
+	local ok, a, b = pcall(function() return Color3.fromHex(accent), Color3.fromHex(bg) end);
+
+	if not ok or not a or not b then return false end;
+
+	local neutral = math.abs(a.R - a.G) < 0.03 and math.abs(a.G - a.B) < 0.03;
+
+	return neutral and a.R > 0.9 and b.R < 0.1
+		and math.abs(b.R - b.G) < 0.02 and math.abs(b.G - b.B) < 0.02;
+end;
+
 -- Older configs saved a theme without palette flags. Keep the colour cards in
 -- sync so a later save cannot replace it with defaults.
 local applyConfig = lib.apply;
@@ -57,18 +75,39 @@ function lib:apply(data)
 	if type(data) ~= "table" or type(data.flags) ~= "table" or type(data.theme) ~= "table" then
 		return applyConfig(self, data);
 	end;
+
+	local source = data;
+
+	if legacyTheme(data.theme) then
+		source = table.clone(data);
+		source.flags = table.clone(data.flags);
+		source.theme = {};
+
+		for key, color in pairs(defaultTheme) do
+			local hex = color:ToHex();
+
+			source.theme[key] = hex;
+
+			local flag = "theme|" .. key;
+
+			if self.pool[flag] then source.flags[flag] = hex end;
+		end;
+	end;
+
 	local patched;
-	for key, color in pairs(data.theme) do
+
+	for key, color in pairs(source.theme) do
 		local flag = "theme|" .. key;
-		if self.pool[flag] and data.flags[flag] == nil then
+		if self.pool[flag] and source.flags[flag] == nil then
 			if not patched then
-				patched = table.clone(data);
-				patched.flags = table.clone(data.flags);
+				patched = table.clone(source);
+				patched.flags = table.clone(source.flags);
 			end;
 			patched.flags[flag] = color;
 		end;
 	end;
-	return applyConfig(self, patched or data);
+
+	return applyConfig(self, patched or source);
 end;
 
 NeverLose.GlobalLogo = lib.logo;
@@ -618,7 +657,7 @@ function NeverLose:CreateWindow(cfg)
 
 	local win = lib:window({
 		size = windowSize(cfg.Size or UDim2.fromOffset(860, 600)),
-		bind = cfg.Keybind or "RightShift",
+		bind = cfg.Keybind or "Delete",
 		title = cfg.Title or NeverLose.Brand,
 		build = cfg.Build or "",
 	});
@@ -652,7 +691,7 @@ function NeverLose:CreateWindow(cfg)
 		Frame = win.shell,
 		Tabs = {},
 		CurrentTab = 1,
-		Keybind = cfg.Keybind or "RightShift",
+		Keybind = cfg.Keybind or "Delete",
 	};
 
 	-- main.lua watches this to know whether the menu is on screen
@@ -941,7 +980,7 @@ function NeverLose:CreateWindow(cfg)
 	});
 
 	-- The watermark on a phone is also the way back into the menu: there is
-	-- no RightShift key there. On a desktop it is just a watermark.
+	-- no Delete key there. On a desktop it is just a watermark.
 	do
 		pcall(function() lib:setopener(NeverLose.Mobile) end);
 
