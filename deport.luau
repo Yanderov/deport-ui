@@ -3915,18 +3915,49 @@ function ui.pill(parent, props)
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, 0, 0.5, 0),
 		Size = UDim2.fromOffset(80, 22),
-		BackgroundColor3 = th.head,
+		BackgroundColor3 = th.panel,
 		BackgroundTransparency = 0,
 		BorderSizePixel = 0,
 	}
 
-	for k, v in next, props or {} do
-		p[k] = v
+	-- a colour chip brings its own colour and keeps a flat body; every other
+	-- field is a glass well
+	local opts = props or {}
+	local tinted = opts.BackgroundColor3 ~= nil
+	local rim = opts.edge ~= false
+
+	for k, v in next, opts do
+		if k ~= "edge" then
+			p[k] = v
+		end
 	end
 
 	local f = new("Frame", p, parent)
 
 	round(f, 7)
+
+	-- A flat grey slab read as an unfinished input. The well is a shallow
+	-- gradient from a lifted top edge down into the panel's own darkness, so
+	-- it sits into the menu instead of on top of it. The dropdown asks for
+	-- its rim separately because it recolours it on hover.
+	if not tinted then
+		new("UIGradient", {
+			Rotation = 90,
+			Color = ColorSequence.new({
+				ColorSequenceKeypoint.new(0, th.head),
+				ColorSequenceKeypoint.new(1, th.bg),
+			}),
+		}, f)
+	end
+
+	if not tinted and rim then
+		new("UIStroke", {
+			Color = th.line,
+			Thickness = 1,
+			Transparency = 0.55,
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+		}, f)
+	end
 
 	return f
 end
@@ -4147,7 +4178,7 @@ function ui.floater(width, height)
 	local hull = new("CanvasGroup", {
 		Name = rnd(),
 		Size = UDim2.fromOffset(width, height),
-		BackgroundColor3 = ui.sheet.bg,
+		BackgroundColor3 = th.side,
 		BackgroundTransparency = 0,
 		BorderSizePixel = 0,
 		GroupTransparency = 1,
@@ -4156,6 +4187,14 @@ function ui.floater(width, height)
 	}, scr)
 
 	round(hull, 12)
+
+	new("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, th.panel),
+			ColorSequenceKeypoint.new(1, th.bg),
+		}),
+	}, hull)
 
 	new("UIStroke", {
 		Color = th.line,
@@ -4491,6 +4530,14 @@ function visualsui:window(cfg)
 			dt = math.min(dt, 0.05)
 			clock += dt
 
+			-- UDim2 offsets are whole pixels on this client, so moving a flake
+			-- by its offset makes it step one pixel at a time - the jerk. Scale
+			-- coordinates keep subpixel positions, so the drift stays smooth at
+			-- any frame rate, 60 or 120. A fixed divisor keeps the sway the same
+			-- fraction of the header without reading AbsoluteSize, which forces
+			-- a layout pass, every frame.
+			local width = 760
+
 			for _, f in next, flakes do
 				f.y += f.speed * dt
 
@@ -4507,7 +4554,7 @@ function visualsui:window(cfg)
 				local drift = math.sin(clock * 0.7 + f.phase) * f.sway
 					+ math.sin(clock * 0.27 + f.phase * 1.7) * f.sway * 0.4
 
-				local spot = UDim2.new(f.x, drift, 0, f.y)
+				local spot = UDim2.new(f.x + drift / width, 0, f.y / FLOOR, 0)
 
 				f.core.Position = spot
 				f.halo.Position = spot
@@ -4517,54 +4564,12 @@ function visualsui:window(cfg)
 		end)
 	end
 
-	local avatar = new("ImageLabel", {
-		Name = rnd(),
-		Position = UDim2.fromOffset(16, 12),
-		Size = UDim2.fromOffset(34, 34),
-		BackgroundColor3 = th.head,
-		BorderSizePixel = 0,
-		ScaleType = Enum.ScaleType.Crop,
-		ZIndex = 5,
-	}, header)
-
-	new("UICorner", { CornerRadius = UDim.new(1, 0) }, avatar)
-
-	new("UIStroke", {
-		Color = th.line,
-		Thickness = 1,
-		Transparency = 0.35,
-		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-	}, avatar)
-
-	task.spawn(function()
-		local ok, image = pcall(function()
-			return plrs:GetUserThumbnailAsync(lp.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100)
-		end)
-
-		if ok and avatar.Parent then
-			avatar.Image = image
-		end
-	end)
-
-	-- the online badge sits on the avatar's lower-right edge, not inside the
-	-- face; the ring is the header's own colour so it cuts a clean hole
-	local dot = new("Frame", {
-		Name = rnd(),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromOffset(46, 42),
-		Size = UDim2.fromOffset(9, 9),
-		BackgroundColor3 = th.accent,
-		BorderSizePixel = 0,
-		ZIndex = 6,
-	}, header)
-
-	new("UICorner", { CornerRadius = UDim.new(1, 0) }, dot)
-
-	new("UIStroke", { Color = th.bg, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, dot)
-
+	-- The header carries just the name and the build line. The avatar and
+	-- its online badge made the menu read as a social profile instead of a
+	-- tool, so both are gone and the text starts at the header's own inset.
 	new("TextLabel", {
 		Name = rnd(),
-		Position = UDim2.fromOffset(60, 10),
+		Position = UDim2.fromOffset(16, 10),
 		Size = UDim2.fromOffset(220, 18),
 		BackgroundTransparency = 1,
 		Font = Enum.Font.GothamBold,
@@ -4578,7 +4583,7 @@ function visualsui:window(cfg)
 
 	new("ImageLabel", {
 		Name = rnd(),
-		Position = UDim2.fromOffset(60, 30),
+		Position = UDim2.fromOffset(16, 30),
 		Size = UDim2.fromOffset(12, 12),
 		BackgroundTransparency = 1,
 		Image = icon("box"),
@@ -4589,7 +4594,7 @@ function visualsui:window(cfg)
 
 	local buildtag = new("TextLabel", {
 		Name = rnd(),
-		Position = UDim2.fromOffset(76, 28),
+		Position = UDim2.fromOffset(32, 28),
 		Size = UDim2.fromOffset(220, 16),
 		BackgroundTransparency = 1,
 		Font = Enum.Font.GothamMedium,
@@ -6200,14 +6205,20 @@ function ui.attach(win, host)
 						anim(inner, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { GroupTransparency = 0 })
 						anim(inner, arrive, { Position = UDim2.fromOffset(10, 0) })
 					else
-						-- fade first, then take the height away once: no frame in
-						-- between asks the page to lay itself out
-						anim(inner, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { GroupTransparency = 1 })
+						-- fade and let the strip sink a little as it goes, so
+						-- closing reads as the panel folding away instead of
+						-- blinking out; then take the height away once, so no
+						-- frame asks the page to lay itself out
+						anim(inner, TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+							GroupTransparency = 1,
+							Position = UDim2.fromOffset(10, 8),
+						})
 
-						task.delay(0.13, function()
+						task.delay(0.15, function()
 							if not shown and fold.Parent then
 								fold.Visible = false
 								fold.Size = UDim2.new(1, 0, 0, 0)
+								inner.Position = UDim2.fromOffset(10, 0)
 							end
 						end)
 					end
@@ -6497,7 +6508,10 @@ function ui.attach(win, host)
 
 		cap.Visible = not wide
 
-		local field = ui.pill(row, { Size = wide and UDim2.new(1, 0, 0, 22) or UDim2.new(0.56, 0, 0, 22) })
+		local field = ui.pill(row, {
+			Size = wide and UDim2.new(1, 0, 0, 22) or UDim2.new(0.56, 0, 0, 22),
+			edge = false,
+		})
 
 		-- The field reads as a glass well: a hairline that comes up when the
 		-- pointer is on it and turns accent while its list is open.
@@ -6571,7 +6585,7 @@ function ui.attach(win, host)
 				r.on = on and true or false
 				r.row:SetAttribute("on", r.on)
 
-				anim(r.row, soft, { BackgroundTransparency = on and 0.86 or 1 })
+				anim(r.row, soft, { BackgroundTransparency = on and 0.88 or 1 })
 				anim(r.edge, soft, { Transparency = on and 0.55 or 1 })
 				anim(r.bar, soft, { BackgroundTransparency = on and 0 or 1 })
 				anim(r.dot, soft, { ImageTransparency = on and 0 or 1 })
@@ -6711,8 +6725,8 @@ function ui.attach(win, host)
 			for n, value in next, list do
 				local line = new("TextButton", {
 					Name = rnd(),
-					Size = UDim2.new(1, 0, 0, 28),
-					BackgroundColor3 = th.glow,
+					Size = UDim2.new(1, 0, 0, 30),
+					BackgroundColor3 = th.text,
 					BackgroundTransparency = 1,
 					BorderSizePixel = 0,
 					Text = "",
@@ -6723,7 +6737,7 @@ function ui.attach(win, host)
 				round(line, 8)
 
 				local lineEdge = new("UIStroke", {
-					Color = th.glow,
+					Color = th.text,
 					Thickness = 1,
 					Transparency = 1,
 					ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
@@ -6731,8 +6745,8 @@ function ui.attach(win, host)
 
 				local text = new("TextLabel", {
 					Name = rnd(),
-					Position = UDim2.fromOffset(12, 0),
-					Size = UDim2.new(1, -36, 1, 0),
+					Position = UDim2.fromOffset(14, 0),
+					Size = UDim2.new(1, -38, 1, 0),
 					BackgroundTransparency = 1,
 					Font = Enum.Font.GothamMedium,
 					Text = value,
@@ -6774,11 +6788,11 @@ function ui.attach(win, host)
 				}, line)
 
 				conn(line.MouseEnter, function()
-					anim(line, quick, { BackgroundTransparency = line:GetAttribute("on") and 0.8 or 0.93 })
+					anim(line, quick, { BackgroundTransparency = line:GetAttribute("on") and 0.82 or 0.94 })
 				end)
 
 				conn(line.MouseLeave, function()
-					anim(line, soft, { BackgroundTransparency = line:GetAttribute("on") and 0.86 or 1 })
+					anim(line, soft, { BackgroundTransparency = line:GetAttribute("on") and 0.88 or 1 })
 				end)
 
 				conn(line.MouseButton1Click, function()
@@ -6808,7 +6822,7 @@ function ui.attach(win, host)
 			shown = true
 
 			local width = math.max(asz(field).X, 132)
-			local tall = math.min(#list * 28 + 8, 228)
+			local tall = math.min(#list * 30 + math.max(#list - 1, 0) * 2 + 8, 244)
 
 			hull.Size = UDim2.fromOffset(width, tall)
 
