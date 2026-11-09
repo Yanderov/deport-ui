@@ -97,24 +97,24 @@ local sc = visualsui.scale
 -- neutral gray so the blue accent reads as part of the surface instead of a
 -- sticker on top of it.
 visualsui.theme = {
-	bg = Color3.fromRGB(6, 9, 18),
-	side = Color3.fromRGB(8, 12, 24),
-	panel = Color3.fromRGB(11, 16, 32),
-	head = Color3.fromRGB(15, 22, 42),
-	line = Color3.fromRGB(34, 54, 96),
-	glow = Color3.fromRGB(96, 148, 255),
-	text = Color3.fromRGB(232, 239, 255),
-	dim = Color3.fromRGB(134, 152, 188),
-	accent = Color3.fromRGB(64, 140, 255),
+	bg = Color3.fromRGB(8, 8, 9),
+	side = Color3.fromRGB(13, 13, 14),
+	panel = Color3.fromRGB(17, 17, 18),
+	head = Color3.fromRGB(28, 28, 30),
+	line = Color3.fromRGB(54, 54, 57),
+	glow = Color3.fromRGB(124, 124, 128),
+	text = Color3.fromRGB(242, 242, 244),
+	dim = Color3.fromRGB(138, 138, 142),
+	accent = Color3.fromRGB(255, 255, 255),
 }
 
 visualsui.sheet = {
-	bg = Color3.fromRGB(9, 14, 28),
-	row = Color3.fromRGB(18, 26, 47),
-	press = Color3.fromRGB(26, 37, 65),
-	sep = Color3.fromRGB(36, 52, 88),
-	grab = Color3.fromRGB(88, 108, 148),
-	blue = Color3.fromRGB(10, 132, 255),
+	bg = Color3.fromRGB(22, 22, 23),
+	row = Color3.fromRGB(38, 38, 40),
+	press = Color3.fromRGB(54, 54, 56),
+	sep = Color3.fromRGB(66, 66, 69),
+	grab = Color3.fromRGB(104, 104, 108),
+	blue = Color3.fromRGB(255, 255, 255),
 }
 
 visualsui.icons = {
@@ -5467,6 +5467,13 @@ function ui.attach(win, host)
 			BorderSizePixel = 0,
 		}, row)
 
+		new("UIStroke", {
+			Color = th.line,
+			Thickness = 1,
+			Transparency = 0.35,
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+		}, track)
+
 		new("UICorner", { CornerRadius = UDim.new(1, 0) }, track)
 
 		local knob = new("Frame", {
@@ -5474,7 +5481,7 @@ function ui.attach(win, host)
 			AnchorPoint = Vector2.new(0, 0.5),
 			Position = UDim2.new(0, on and 18 or 2, 0.5, 0),
 			Size = UDim2.fromOffset(14, 14),
-			BackgroundColor3 = th.text,
+			BackgroundColor3 = on and th.bg or th.text,
 			BorderSizePixel = 0,
 		}, track)
 
@@ -5485,7 +5492,10 @@ function ui.attach(win, host)
 
 		local function paint()
 			anim(track, glide, { BackgroundColor3 = on and th.accent or th.head })
-			anim(knob, glide, { Position = UDim2.new(0, on and 18 or 2, 0.5, 0) })
+			anim(knob, glide, {
+				Position = UDim2.new(0, on and 18 or 2, 0.5, 0),
+				BackgroundColor3 = on and th.bg or th.text,
+			})
 			anim(cap, glide, { TextColor3 = on and th.text or th.dim })
 		end
 
@@ -5587,16 +5597,20 @@ function ui.attach(win, host)
 					visualsui:chime("tap")
 					anim(dots, glide, { ImageColor3 = shown and th.text or th.dim, Rotation = shown and 90 or 0 })
 
-					local from = asz(fold).Y
+					-- One tween, not a Lua callback every frame: the strip sits
+					-- inside four nested AutomaticSize frames, and re-driving
+					-- its height from Lua re-laid the whole page out each frame.
 					local to = shown and asz(inner).Y or 0
 
-					flow(fold, 0.18, outq, function(k)
-						fold.Size = UDim2.new(1, 0, 0, from + (to - from) * k)
+					anim(fold, soft, { Size = UDim2.new(1, 0, 0, to) })
 
-						if k >= 1 and not shown then
-							fold.Visible = false
-						end
-					end)
+					if not shown then
+						task.delay(0.24, function()
+							if not shown and fold.Parent then
+								fold.Visible = false
+							end
+						end)
+					end
 				end)
 
 				conn(inner:GetPropertyChangedSignal("AbsoluteSize"), function()
