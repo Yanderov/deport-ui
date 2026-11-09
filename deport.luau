@@ -93,9 +93,8 @@ visualsui.scale = visualsui.mobile and 0.85 or 1
 
 local sc = visualsui.scale
 
--- Black-blue, not black-white. The menu sits on a deep navy rather than a
--- neutral gray so the blue accent reads as part of the surface instead of a
--- sticker on top of it.
+-- Neutral, not tinted. The menu sits on near-black grays so the white accent
+-- reads as light on the surface rather than a sticker on top of it.
 visualsui.theme = {
 	bg = Color3.fromRGB(8, 8, 9),
 	side = Color3.fromRGB(13, 13, 14),
@@ -4731,7 +4730,7 @@ function visualsui:window(cfg)
 	}, shell)
 
 	-- --------------------------------------------------------- backdrop ----
-	-- The space behind the cards is a surface of its own: a faint blue wash
+	-- The space behind the cards is a surface of its own: a soft wash
 	-- from the header down, a hairline grid, and a soft floor above the dock.
 	-- Everything here is static, so a page change never re-lays it out.
 	do
@@ -5852,8 +5851,8 @@ function ui.attach(win, host)
 
 		round(face, 10)
 
-		-- a faint blue tint over the body, so the action reads as part of the
-		-- palette instead of a neutral slab
+		-- a faint light tint over the body, so the action reads as part of the
+		-- palette instead of a flat slab
 		local tint = new("Frame", {
 			Name = rnd(),
 			Size = UDim2.fromScale(1, 1),
